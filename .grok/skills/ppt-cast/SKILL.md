@@ -37,6 +37,16 @@ For regression suites, real-generation evaluation, gallery publication, or v1/v2
 
 For identity/body construction, additionally read [character-model.md](references/character-model.md). For generation/frame/slot inspection details, read [qa.md](references/qa.md). Load the felt-specific human guide only for `felt-yarn` work: [felt-yarn.md](references/presets/felt-yarn.md).
 
+## Focused felt editorial master
+
+When the user asks for the reference-led premium felt card composition, choose `felt_editorial_split_master` instead of adding more Composition families. Read [felt-master-template-design-principles.md](references/felt-master-template-design-principles.md) and load `.grok/skills/ppt-cast/scripts/felt_editorial_split_master.js`.
+
+The master has one 2.08:1 centered card and two strict mirrors only: `media-left` and `media-right`. Use the selected 57/43 media/panel ratio unless the user is explicitly reviewing the three ratio candidates. Keep the native headline, body, and closing line in the charcoal panel; generate the media at a near-6:5 aspect and keep its subject inside the central safe area.
+
+Supported page inputs are intentionally narrow: `mediaSide`, `eyebrowOrIcon`, `pageNumber`, `headline`, `body`, `closingLine`, `videoPoster`, `videoSlot`, and optional `characterSet`. `characterSet.referenceImages` accepts one or two job-relative user uploads; there is no default mascot. Preserve the uploaded identity while recomposing the felt miniature scene, and never treat sample characters as template identity.
+
+Before rendering, copy the packaged `.grok/skills/ppt-cast/assets/felt-edge-negative-mask.png` to `<job>/assets/felt-edge-negative-mask.png`. Apply it as the card-level negative alpha overlay so the warm canvas color remains adaptive around both panel and media. Do not replace it with a sawtooth shape, generic scallop, or two independently rounded rectangles.
+
 ## v2 default workflow
 
 1. Run `doctor`, initialize the v2 job, and author approved content/visual contracts. Candidate does not require PowerPoint; final does.
