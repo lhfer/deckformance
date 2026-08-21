@@ -17,6 +17,30 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 ORPHAN_PUNCTUATION = set("，。！？；：、,.!?;:)]}》」』】")
+CJK_FONT_MARKERS = (
+    "cjk",
+    "heiti",
+    "hiragino sans gb",
+    "microsoft yahei",
+    "noto sans sc",
+    "noto sans tc",
+    "pingfang",
+    "simsun",
+    "songti",
+    "source han",
+    "微软雅黑",
+    "黑体",
+    "宋体",
+)
+
+
+def contains_cjk(value: str) -> bool:
+    return any("\u4e00" <= ch <= "\u9fff" for ch in value)
+
+
+def is_cjk_font_face(value: object) -> bool:
+    normalized = str(value or "").casefold()
+    return any(marker in normalized for marker in CJK_FONT_MARKERS)
 
 
 def hex_rgb(s: str, fallback: str) -> tuple[int, int, int]:
@@ -111,11 +135,8 @@ def main() -> int:
     ink_muted = hex_rgb(pal.get("inkMuted"), "6B6560")
     fonts = layouts_doc["fonts"]
     issues: list[str] = []
-    cjk = bool(deck.get("fontFace")) or any(
-        any(
-            "\u4e00" <= ch <= "\u9fff"
-            for ch in str(s.get("title", "") + "".join(s.get("body") or []))
-        )
+    cjk = is_cjk_font_face(deck.get("fontFace")) or any(
+        contains_cjk(str(s.get("title", "") + "".join(s.get("body") or [])))
         for s in deck.get("slides") or []
     )
 
