@@ -38,6 +38,7 @@ The selected default is `57/43` because:
 - card aspect: approximately `2.08:1`;
 - card position: optically and mathematically centered vertically;
 - panel: opaque charcoal, approximately `#232424`;
+- panel outline: emit a true no-fill line (`fill: "none"`, `width: 0`). Never use a zero-width solid charcoal line; PowerPoint renders it as a one-pixel hairline outside the felt mask even when static preview renderers hide it;
 - media and panel: same height, no gutter, straight internal seam;
 - rounding belongs to the outer card only; the seam must not look like two adjacent rounded cards;
 - the fine felt edge is a source-derived alpha mask, not a generated border or geometric sawtooth. Its 608×294 source contour is extracted from the supplied reference card's complete outer pixel boundary, reconstructed from the four edge profiles with subpixel antialiasing, then scaled to the master. The negative overlay reveals the canvas only where the original silhouette is transparent, so media and panel keep their own colors;
@@ -91,3 +92,4 @@ Engineering fit is necessary but not sufficient. Accept the master only after:
 - confirming media subjects do not hit the seam;
 - confirming every page uses the same outer silhouette and vertical anchors;
 - separating poster/template acceptance from real generated-video provenance and PowerPoint playback acceptance.
+- inspecting the exported PPTX XML so every `felt-panel-*` has `<a:noFill/>` under its line and no solid line fill. Static preview renderers may hide the PowerPoint-only zero-width hairline.

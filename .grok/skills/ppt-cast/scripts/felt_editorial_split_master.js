@@ -31,6 +31,11 @@ const CANDIDATE_RATIOS = Object.freeze([
   Object.freeze({ id: "B", media: 0.57, panel: 0.43, note: "selected, balanced, near-6:5-media" }),
   Object.freeze({ id: "C", media: 0.60, panel: 0.40, note: "visual-first, narrow-copy-measure" }),
 ]);
+const PANEL_TREATMENT = Object.freeze({
+  fill: "#232424",
+  line: Object.freeze({ style: "solid", fill: "none", width: 0 }),
+  powerPointHairlineSafe: true,
+});
 
 function graphemeCount(value) {
   return graphemeRecords(value).length;
@@ -160,6 +165,20 @@ function ratioRecord(value) {
   return byNumber;
 }
 
+function panelShapeConfigForFeltMaster(position, name) {
+  if (!position || typeof position !== "object" || Array.isArray(position)) fail("panel position must be an object");
+  for (const key of ["left", "top", "width", "height"]) {
+    if (!Number.isFinite(Number(position[key]))) fail(`panel position.${key} must be finite`);
+  }
+  return {
+    geometry: "rect",
+    name: name === undefined || name === null || !String(name).trim() ? "felt-panel" : String(name),
+    position: Object.fromEntries(["left", "top", "width", "height"].map((key) => [key, Number(position[key])])),
+    fill: PANEL_TREATMENT.fill,
+    line: { ...PANEL_TREATMENT.line },
+  };
+}
+
 function geometryForFeltMaster({ slideWidth, slideHeight, mediaSide = "media-left", ratio = "B" }) {
   if (!(Number(slideWidth) > 0) || !(Number(slideHeight) > 0)) fail("slideWidth and slideHeight must be positive");
   if (!MEDIA_SIDES.includes(mediaSide)) fail(`mediaSide must be one of ${MEDIA_SIDES.join(", ")}`);
@@ -198,6 +217,11 @@ function geometryForFeltMaster({ slideWidth, slideHeight, mediaSide = "media-lef
     card: Object.fromEntries(Object.entries(card).map(([key, value]) => [key, round(value)])),
     media: Object.fromEntries(Object.entries(media).map(([key, value]) => [key, round(value)])),
     panel: Object.fromEntries(Object.entries(panel).map(([key, value]) => [key, round(value)])),
+    panelTreatment: {
+      fill: PANEL_TREATMENT.fill,
+      line: { ...PANEL_TREATMENT.line },
+      powerPointHairlineSafe: PANEL_TREATMENT.powerPointHairlineSafe,
+    },
     padding: round(padding),
     cornerRadius: round(Number(slideWidth) * 0.011),
     seamOverlap: round(cardWidth * 0.0156),
@@ -418,6 +442,10 @@ function createFeltMasterModel(input, options = {}) {
     templateId: TEMPLATE_ID,
     variables: normalized,
     geometry,
+    panelShape: panelShapeConfigForFeltMaster(
+      geometry.panel,
+      normalized.pageNumber ? `felt-panel-${normalized.pageNumber}` : "felt-panel",
+    ),
     headlineShaping: headline_shaping_for_felt_master(normalized.headline, {
       ...options.headline,
       panelWidthPt,
@@ -435,6 +463,7 @@ const felt_editorial_split_master = Object.freeze({
   variants: MEDIA_SIDES,
   variables: ALLOWED_INPUT_KEYS,
   palette: Object.freeze({ canvas: "#F3EAE1", panel: "#232424", title: "#F6F2EC", body: "#C8C4BD", closing: "#F2EEE8" }),
+  panelTreatment: PANEL_TREATMENT,
   geometry: geometryForFeltMaster,
   createModel: createFeltMasterModel,
 });
@@ -444,6 +473,7 @@ module.exports = {
   CANDIDATE_RATIOS,
   DEFAULT_PROTECTED_PHRASES,
   MEDIA_SIDES,
+  PANEL_TREATMENT,
   TEMPLATE_ID,
   body_shaping_for_felt_master,
   createFeltMasterModel,
@@ -451,4 +481,5 @@ module.exports = {
   felt_editorial_split_master,
   geometryForFeltMaster,
   headline_shaping_for_felt_master,
+  panelShapeConfigForFeltMaster,
 };
