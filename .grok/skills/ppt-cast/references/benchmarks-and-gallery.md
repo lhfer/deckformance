@@ -4,9 +4,9 @@ Read this reference when running regressions, comparing v1/v2, evaluating genera
 
 ## Keep two evidence tracks separate
 
-Fixed-media benchmarks use immutable local fixtures to test compiler decisions, typography, native layers, PPTX packaging, timing, render regression, and failure rejection. They should be deterministic on the pinned OS, fonts, renderer, evaluator/rubric, and runtime.
+Fixed-media benchmarks use immutable local fixtures to test compiler decisions, typography, native layers, PPTX packaging, timing, render regression, and failure rejection. They should be deterministic on the pinned OS, fonts, renderer, evaluator/rubric, and runtime. They are test-only and cannot satisfy a v2 dynamic-slide candidate or public release.
 
-Real-generation benchmarks test provider variability, character identity, body completeness, crop, action continuity, expressive relevance, and art direction. They must record provider/model/prompt hash/seed/request ID/version/latency/cost and cannot borrow fixed-media results as proof of generation quality.
+Real-generation benchmarks test provider variability, character identity, body completeness, crop, action continuity, expressive relevance, and art direction. Every dynamic-slide attempt must bind a concrete external model invocation with `operation: generate-video`, provider/model/prompt hash/seed when supported/request or task ID/version/latency/cost, adapter implementation, inputs, and exact final MP4 output. Fixture/synthetic media, `import-video`, local clips, static/native/CSS/programmatic motion, and fixed-media results cannot be counted as real-generation evidence or candidate media.
 
 The benchmark catalog under `references/benchmarks/` includes layout census, bust-to-full-body, Chinese mascot, occlusion/multiple-character selection, failure injection, and legacy-negative cases. The manifests are benchmark definitions, not evidence that a run passed.
 
@@ -22,7 +22,7 @@ Aggregate actual run records with the executable gate:
 node <SKILL_DIR>/scripts/benchmark_report.js runs.json --output benchmark-report.json
 ```
 
-The command verifies retry-budget shape, derives first-pass/within-budget rates, computes the six medians from selected real-generation attempts, rejects selected P0/P1, and emits a hash-bound report. It exits non-zero when a gate fails.
+The command verifies retry-budget shape, derives first-pass/within-budget rates, computes the six medians from selected real-generation attempt records, rejects selected P0/P1, and emits a hash-bound report. The run manifest must already bind the external provider receipts and final media; aggregate mathematics or a `track: real-generation` label alone does not prove a model invocation. It exits non-zero when a gate fails.
 
 Fixed visual regression requires OCR text equivalence and zero overflow/unintended occlusion. For unapproved pixel changes, use SSIM at least 0.995 under the pinned environment. These are release criteria only after an actual run produces receipts; do not cite the thresholds as achieved results.
 
@@ -43,7 +43,7 @@ Keep the original 61-case v1 suite as a permanent regression baseline. The M0 co
 
 ## Public gallery gate
 
-The gallery is generated only from completed, passed, explicitly public and `galleryEligible` benchmark-run manifests. Each manifest must set a safe manifest-relative `jobDir`; the builder re-runs current v2 candidate/final validation and compares its released artifact hash with the declared PPTX. Each accepted entry must expose hash-bound brief, content, visual/design decision trace, page renders, PPTX, QA/evaluation, a self-hashed passing benchmark report containing the run, sources, release label, and known limitations. Put remote source URLs inside a locally hash-bound source index; bare remote descriptors are not accepted as verified gallery evidence.
+The gallery is generated only from completed, passed, explicitly public and `galleryEligible` real-generation benchmark-run manifests. Fixed-media runs remain internal regression evidence and cannot publish a v2 dynamic-slide candidate/gallery success. Each manifest must set a safe manifest-relative `jobDir`; the builder re-runs current v2 candidate/final validation and compares its released artifact hash with the declared PPTX. Each accepted entry must expose hash-bound brief, content, visual/design decision trace, external `generate-video` provider receipts, page renders, PPTX, QA/evaluation, a self-hashed passing benchmark report containing the run, sources, release label, and known limitations. Put remote source URLs inside a locally hash-bound source index; bare remote descriptors are not accepted as verified gallery evidence.
 
 ```bash
 node <SKILL_DIR>/scripts/build_gallery.js \

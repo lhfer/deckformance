@@ -29,6 +29,7 @@ const {
 const {
   checkFonts,
   checkNodeDependencies,
+  checkProvider,
   detectHost,
   makeCheck,
   runDoctor,
@@ -117,25 +118,39 @@ test("provider and renderer adapters emit implementation and artifact-bound rece
   write(root, "input.txt", "input\n");
   class FixtureProvider extends ProviderAdapter {
     constructor() {
-      super({ id: "fixture-provider", version: "1.2.3", model: "model-a", capabilities: { video: true } });
+      super({ id: "fixture-provider", version: "1.2.3", model: "model-a", transport: "api", capabilities: { video: true } });
     }
     async generateVideo() {
       write(root, "media/video.mp4", "video bytes");
-      return { requestId: "req-1", outputs: ["media/video.mp4"], cost: { currency: "USD", amount: 0.1 } };
+      return { status: "completed", requestId: "req-1", outputs: ["media/video.mp4"], cost: { currency: "USD", amount: 0.1 } };
     }
   }
-  const provider = await invokeProvider(new FixtureProvider(), "generate-video", { prompt: "private prompt", seed: 7 }, {
+  const provider = await invokeProvider(new FixtureProvider(), "generate-video", {
+    prompt: "private prompt",
+    seed: 7,
+    motionPlanSha256: `sha256:${"a".repeat(64)}`,
+    generationRequestSha256: `sha256:${"b".repeat(64)}`,
+    slideId: "01",
+    layerId: "01.video.performance",
+  }, {
     root,
     implementationFiles: ["adapter.js"],
     inputs: ["input.txt"],
     receiptPath: "qa/provider-receipt.json",
+    validateOutput: async () => ({ passed: true }),
   });
   assert.equal(provider.receipt.kind, "provider");
   assert.equal(provider.receipt.metadata.promptSha256, sha256Buffer("private prompt"));
   assert.doesNotMatch(JSON.stringify(provider.receipt), /private prompt/);
   assert.equal(verifyHashBoundReceipt(root, provider.receipt).ok, true);
   await assert.rejects(
-    () => invokeProvider(new FixtureProvider(), "generate-video", { prompt: "private prompt" }, { root, implementationFiles: [] }),
+    () => invokeProvider(new FixtureProvider(), "generate-video", {
+      prompt: "private prompt",
+      motionPlanSha256: `sha256:${"a".repeat(64)}`,
+      generationRequestSha256: `sha256:${"b".repeat(64)}`,
+      slideId: "01",
+      layerId: "01.video.performance",
+    }, { root, implementationFiles: [] }),
     /at least one current implementation file/,
   );
 
@@ -279,6 +294,17 @@ test("doctor exposes ready, degraded, and blocked exit semantics and verifies np
   assert.throws(() => requireRelease("draft"), /candidate or final/);
   assert.deepEqual([exitCodeForStatus("ready"), exitCodeForStatus("degraded"), exitCodeForStatus("blocked")], [0, 2, 1]);
   assert.throws(() => exitCodeForStatus("unknown"), /unknown release status/);
+  const missingProvider = checkProvider({ env: {} });
+  assert.equal(missingProvider.status, "warn");
+  assert.equal(missingProvider.detail.generationReady, false);
+  assert.match(missingProvider.summary, /design\/preview/);
+  const declaredProvider = checkProvider({ env: {
+    DECKFORMANCE_PROVIDER: "configured-external-provider",
+    DECKFORMANCE_PROVIDER_CAPABILITIES: JSON.stringify(["generate-video"]),
+  } });
+  assert.equal(declaredProvider.status, "pass");
+  assert.equal(declaredProvider.detail.generationReady, true);
+  assert.match(declaredProvider.summary, /live model invocation is still required/);
   const ready = await runDoctor({ checks: [pass] });
   const degraded = await runDoctor({ checks: [pass, warn] });
   const blocked = await runDoctor({ checks: [fail] });

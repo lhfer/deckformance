@@ -255,16 +255,16 @@ function checkProvider(options) {
     }
   }
   capabilities = [...new Set(capabilities)].sort();
-  const generationReady = ["image", "video"].every((capability) => capabilities.includes(capability));
+  const generationReady = capabilities.includes("generate-video");
   return makeCheck(
     "provider",
     provider && generationReady ? "pass" : "warn",
     false,
     provider && generationReady
-      ? `Provider adapter ${provider} declares image and video capabilities`
+      ? `Provider adapter ${provider} declares generate-video capability; a live model invocation is still required before media-ready`
       : provider
-        ? `Provider adapter ${provider} is configured without complete image/video capability declaration`
-        : "No provider adapter is configured; only already-supplied, receipt-bound fixed media can be built",
+        ? `Provider adapter ${provider} is configured without an explicit generate-video capability declaration`
+        : "No external video provider is configured; work may continue only through design/preview until a real model is invoked",
     { provider: provider || null, capabilities, generationReady },
   );
 }

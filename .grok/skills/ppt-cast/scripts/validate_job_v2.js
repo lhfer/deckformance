@@ -58,7 +58,7 @@ const CONTRACT_STAGE = Object.freeze({
   deck: "packaged",
 });
 const REQUIRED_RELEASE_TRACKS = Object.freeze(Object.keys(CONTRACT_FILES));
-const V2_SCHEMA_NAMES = Object.freeze(["typography", "content-plan", "visual-plan", "design-plan", "asset-manifest", "deck", "job"]);
+const V2_SCHEMA_NAMES = Object.freeze(["typography", "content-plan", "visual-plan", "design-plan", "asset-manifest", "deck", "job", "provider-receipt"]);
 const EXPECTED_PACKAGE_REPORT = "qa/package-qa.json";
 const EXPECTED_RENDER_INDEX = "qa/rendered-candidate/render-index.json";
 const EXPECTED_RENDER_QA = "qa/render-qa.json";
@@ -151,6 +151,10 @@ function isDateTime(value) {
 
 function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function requiresMediaEvidence(stageIndex, strict) {
+  return strict === true || stageIndex >= STAGES.indexOf("media-ready");
 }
 
 let compiledValidators = null;
@@ -717,13 +721,43 @@ function decodeFrameRgb(ffmpegPath, args, pointer, errors) {
   return result.stdout;
 }
 
-function validateProviderReceipt(jobDir, reference, output, acceptedInputs, pointer, errors) {
+function validateExternalVideoProviderReceipt(receipt, output, pointer, errors, options = {}) {
+  const before = errors.length;
+  validateSchema(receipt, "provider-receipt", pointer, errors);
+  const producer = receipt && receipt.producer;
+  const metadata = receipt && receipt.metadata;
+  const outputMp4 = metadata && metadata.outputMp4;
+  const validTransport = metadata && ["host", "http", "command", "api"].includes(metadata.transport);
+  const canonicalOutput = isObject(output) ? output : {};
+  const outputMatches = isObject(outputMp4) && outputMp4.path === canonicalOutput.path && outputMp4.sha256 === canonicalOutput.sha256 && outputMp4.bytes === canonicalOutput.bytes;
+  const explicitlySynthetic = isObject(metadata && metadata.providerMetadata) && (
+    metadata.providerMetadata.syntheticFixture === true || metadata.providerMetadata.liveProviderProof === false
+  );
+  if (
+    !isObject(metadata) || metadata.contractVersion !== "deckformance.provider-video/1" ||
+    metadata.providerClass !== "external-video-generation-model" || !nonEmpty(metadata.adapterClass) ||
+    metadata.operation !== "generate-video" || !validTransport ||
+    !nonEmpty(metadata.provider) || metadata.provider !== (producer && producer.name) ||
+    !nonEmpty(metadata.providerVersion) || metadata.providerVersion !== (producer && producer.version) ||
+    !nonEmpty(metadata.model) || !nonEmpty(metadata.requestId) || !validHash(metadata.promptSha256) ||
+    !validHash(metadata.generationRequestSha256) || metadata.motionPlanSha256 !== options.motionPlanSha256 ||
+    metadata.slideId !== options.slideId || metadata.layerId !== options.layerId ||
+    !Number.isFinite(metadata.durationMs) || metadata.durationMs < 0 ||
+    !(metadata.cost === null || isObject(metadata.cost)) || metadata.mediaContractValidated !== true || explicitlySynthetic ||
+    !outputMatches || !nonEmpty(canonicalOutput.path) || !canonicalOutput.path.toLowerCase().endsWith(".mp4")
+  ) {
+    issue(errors, "EXTERNAL_VIDEO_PROVIDER", pointer, "must be a generate-video receipt from an external video generation model over host/http/command/api with provider/model/requestId/prompt/version/timing/cost and metadata.outputMp4 exactly bound to the canonical MP4");
+  }
+  return errors.length === before;
+}
+
+function validateProviderReceipt(jobDir, reference, output, acceptedInputs, pointer, errors, options = {}) {
   const evidence = readBoundJson(jobDir, reference, pointer, errors);
-  if (!evidence) return;
+  if (!evidence) return { externalVideoGenerationVerified: false };
   const verified = verifyHashBoundReceipt(jobDir, evidence.value);
   if (!verified.ok || evidence.value.kind !== "provider") {
     issue(errors, "PROVIDER_RECEIPT", pointer, `must be a current hash-bound provider receipt: ${verified.errors.join("; ")}`);
-    return;
+    return { externalVideoGenerationVerified: false };
   }
   const producer = evidence.value.producer;
   const metadata = evidence.value.metadata;
@@ -739,14 +773,18 @@ function validateProviderReceipt(jobDir, reference, output, acceptedInputs, poin
     !nonEmpty(metadata.requestId) || !Number.isFinite(metadata.durationMs) || metadata.durationMs < 0 ||
     !(metadata.cost === null || isObject(metadata.cost))
   ) issue(errors, "PROVIDER_PROVENANCE", pointer, "must record provider, providerVersion, model, operation, prompt hash, request ID, non-negative duration, and cost/null matching the bound implementation");
-  const outputMatch = (evidence.value.outputs || []).some((item) => item.path === output.path && item.sha256 === output.sha256 && item.bytes === output.bytes);
-  if (!outputMatch) issue(errors, "PROVIDER_OUTPUT_BINDING", pointer, `does not bind ${output.path}`);
+  const outputMatch = isObject(output) && (evidence.value.outputs || []).some((item) => item.path === output.path && item.sha256 === output.sha256 && item.bytes === output.bytes);
+  if (!outputMatch) issue(errors, "PROVIDER_OUTPUT_BINDING", pointer, `does not bind ${isObject(output) ? output.path : "the canonical output"}`);
   if (acceptedInputs && acceptedInputs.length) {
     const inputMatch = (evidence.value.inputs || []).some((item) => acceptedInputs.some((accepted) => (
       accepted && item.path === accepted.path && item.sha256 === accepted.sha256
     )));
     if (!inputMatch) issue(errors, "PROVIDER_INPUT_BINDING", pointer, "video generation must bind the canonical poster or selected performance-bible bytes as an input");
   }
+  const externalVideoGenerationVerified = options.requireExternalVideoGeneration === true
+    ? validateExternalVideoProviderReceipt(evidence.value, output, pointer, errors, options) && outputMatch
+    : false;
+  return { externalVideoGenerationVerified, receipt: evidence.value };
 }
 
 function validateMediaEvidence(jobDir, designPlan, assetManifest, characterModel, errors, options = {}) {
@@ -763,6 +801,7 @@ function validateMediaEvidence(jobDir, designPlan, assetManifest, characterModel
       issue(errors, "MEDIA_SLIDE_BINDING", pointer, "does not match a hybrid-video design slide");
       continue;
     }
+    const videoLayer = (slide.layers || []).find((layer) => layer.type === "video");
     const poster = validateFileDescriptor(jobDir, record.poster, `${pointer}.poster`, errors, "png");
     const video = validateFileDescriptor(jobDir, record.video, `${pointer}.video`, errors);
     if (!poster || !video) continue;
@@ -781,6 +820,12 @@ function validateMediaEvidence(jobDir, designPlan, assetManifest, characterModel
       [record.poster, selected].filter(Boolean),
       `${pointer}.providerReceipts.video`,
       errors,
+      {
+        requireExternalVideoGeneration: true,
+        motionPlanSha256: slide.motionPlan && slide.motionPlan.planSha256,
+        slideId: slide.id,
+        layerId: videoLayer && videoLayer.id,
+      },
     );
 
     const frames = record.qa && Array.isArray(record.qa.frames) ? record.qa.frames : [];
@@ -1062,6 +1107,7 @@ function validateJobV2(jobDirValue, options = {}) {
   const through = options.throughStage && STAGES.includes(options.throughStage) ? options.throughStage : actualStage;
   const stageIndex = Math.max(STAGES.indexOf(actualStage), STAGES.indexOf(through));
   const strict = options.releaseLevel === "candidate" || options.releaseLevel === "final";
+  const mediaReady = requiresMediaEvidence(stageIndex, strict);
   const contracts = {};
   for (const [key, relativePath] of Object.entries(CONTRACT_FILES)) {
     const required = strict || stageIndex >= STAGES.indexOf(CONTRACT_STAGE[key]);
@@ -1080,7 +1126,7 @@ function validateJobV2(jobDirValue, options = {}) {
   if (options.skipEnvironmentBindings !== true) validateFontBindings(contracts.designPlan, errors);
   if (contracts.designPlan) validateBoundDescriptors(root, contracts.designPlan.registeredAssets, "designPlan.registeredAssets", errors);
   if (contracts.assetManifest) validateBoundDescriptors(root, contracts.assetManifest, "assetManifest", errors);
-  if (strict) validateMediaEvidence(root, contracts.designPlan, contracts.assetManifest, contracts.characterModel, errors, {
+  if (mediaReady) validateMediaEvidence(root, contracts.designPlan, contracts.assetManifest, contracts.characterModel, errors, {
     ffmpegPath: options.ffmpegPath,
     requireHumanApproval: options.releaseLevel === "final",
   });
@@ -1165,6 +1211,7 @@ module.exports = {
   currentContractHashes,
   decodePng,
   printableResult,
+  requiresMediaEvidence,
   schemaValidators,
   validateBoundDescriptors,
   validateCharacterModelSemantics,

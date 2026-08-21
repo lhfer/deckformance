@@ -203,6 +203,7 @@
       }
     },
     "motionPlan": {
+      "description": "Resolved video direction and playback intent. The external provider generates the MP4; this object never synthesizes media bytes.",
       "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {

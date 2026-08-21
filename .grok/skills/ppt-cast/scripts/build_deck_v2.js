@@ -186,13 +186,44 @@ function receiptFile(jobDir, reference, label) {
   return { asset, value: readJson(asset.filePath, label) };
 }
 
-function assertProviderReceipt(jobDir, reference, expected, label) {
+function assertExternalVideoGeneration(receipt, expected, label, options = {}) {
+  const producer = receipt && receipt.producer;
+  const metadata = receipt && receipt.metadata;
+  const outputMp4 = metadata && metadata.outputMp4;
+  const canonicalOutput = expected && typeof expected === "object" ? expected : {};
+  const outputMatches = outputMp4 && outputMp4.path === canonicalOutput.path && outputMp4.sha256 === canonicalOutput.sha256 && outputMp4.bytes === canonicalOutput.bytes;
+  const receiptOutputs = receipt && Array.isArray(receipt.outputs) ? receipt.outputs : [];
+  const oneCanonicalOutput = receiptOutputs.length === 1 && receiptOutputs[0].path === canonicalOutput.path && receiptOutputs[0].sha256 === canonicalOutput.sha256 && receiptOutputs[0].bytes === canonicalOutput.bytes;
+  const providerMetadata = metadata && metadata.providerMetadata;
+  const explicitlySynthetic = providerMetadata && (providerMetadata.syntheticFixture === true || providerMetadata.liveProviderProof === false);
+  if (
+    !metadata || metadata.contractVersion !== "deckformance.provider-video/1" ||
+    metadata.providerClass !== "external-video-generation-model" || typeof metadata.adapterClass !== "string" || !metadata.adapterClass.trim() ||
+    metadata.operation !== "generate-video" || !["host", "http", "command", "api"].includes(metadata.transport) ||
+    typeof metadata.provider !== "string" || !metadata.provider.trim() || metadata.provider !== (producer && producer.name) ||
+    typeof metadata.providerVersion !== "string" || !metadata.providerVersion.trim() || metadata.providerVersion !== (producer && producer.version) ||
+    typeof metadata.model !== "string" || !metadata.model.trim() ||
+    typeof metadata.requestId !== "string" || !metadata.requestId.trim() ||
+    !/^sha256:[a-f0-9]{64}$/.test(String(metadata.promptSha256 || "")) ||
+    !/^sha256:[a-f0-9]{64}$/.test(String(metadata.generationRequestSha256 || "")) ||
+    metadata.motionPlanSha256 !== options.motionPlanSha256 || metadata.slideId !== options.slideId || metadata.layerId !== options.layerId ||
+    !Number.isFinite(metadata.durationMs) || metadata.durationMs < 0 ||
+    !(metadata.cost === null || metadata.cost && typeof metadata.cost === "object" && !Array.isArray(metadata.cost)) ||
+    metadata.mediaContractValidated !== true ||
+    explicitlySynthetic || typeof canonicalOutput.path !== "string" || !canonicalOutput.path.toLowerCase().endsWith(".mp4") || !outputMatches || !oneCanonicalOutput
+  ) {
+    fail(`${label} must prove external generate-video provenance and bind metadata.outputMp4 to the canonical MP4`);
+  }
+}
+
+function assertProviderReceipt(jobDir, reference, expected, label, options = {}) {
   const receipt = receiptFile(jobDir, reference, label);
   const verified = verifyHashBoundReceipt(jobDir, receipt.value);
   if (!verified.ok || receipt.value.kind !== "provider") fail(`${label} is not a valid hash-bound provider receipt: ${verified.errors.join("; ")}`);
-  const output = (receipt.value.outputs || []).find((item) => item.path === expected.path);
-  if (!output || output.sha256 !== expected.sha256 || output.bytes !== expected.bytes) fail(`${label} does not bind ${expected.path}`);
-  return receipt;
+  const output = expected && typeof expected === "object" ? (receipt.value.outputs || []).find((item) => item.path === expected.path) : null;
+  if (!output || output.sha256 !== expected.sha256 || output.bytes !== expected.bytes) fail(`${label} does not bind ${expected && expected.path || "the canonical output"}`);
+  if (options.requireExternalVideoGeneration === true) assertExternalVideoGeneration(receipt.value, expected, label, options);
+  return { ...receipt, externalVideoGenerationVerified: options.requireExternalVideoGeneration === true };
 }
 
 function collectMedia(jobDir, designPlan, manifest, options = {}) {
@@ -237,7 +268,18 @@ function collectMedia(jobDir, designPlan, manifest, options = {}) {
     const poster = assertDescriptor(jobDir, record.poster, `slide ${slide.id} poster`);
     const video = assertDescriptor(jobDir, record.video, `slide ${slide.id} video`);
     const posterProvider = assertProviderReceipt(jobDir, record.providerReceipts.poster, record.poster, `slide ${slide.id} poster provider receipt`);
-    const videoProvider = assertProviderReceipt(jobDir, record.providerReceipts.video, record.video, `slide ${slide.id} video provider receipt`);
+    const videoProvider = assertProviderReceipt(
+      jobDir,
+      record.providerReceipts.video,
+      record.video,
+      `slide ${slide.id} video provider receipt`,
+      {
+        requireExternalVideoGeneration: true,
+        motionPlanSha256: slide.motionPlan && slide.motionPlan.planSha256,
+        slideId: slide.id,
+        layerId: layer.id,
+      },
+    );
     if (record.qa.binding.posterProviderReceiptSha256 !== posterProvider.asset.sha256 || record.qa.binding.videoProviderReceiptSha256 !== videoProvider.asset.sha256) {
       fail(`slide ${slide.id} QA does not bind provider receipts`);
     }
@@ -264,6 +306,7 @@ function collectMedia(jobDir, designPlan, manifest, options = {}) {
       posterSha256: poster.sha256,
       videoSha256: video.sha256,
       durationMs: Math.round(videoInfo.duration * 1000),
+      externalGenerationVerified: videoProvider.externalVideoGenerationVerified === true,
     });
     budgetDescriptors.push({
       slideId: slide.id,
@@ -442,6 +485,7 @@ if (require.main === module) {
 
 module.exports = {
   assertDescriptor,
+  assertExternalVideoGeneration,
   collectMedia,
   parseArgs,
   resolveJobOutput,

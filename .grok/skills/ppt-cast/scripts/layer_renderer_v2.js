@@ -191,6 +191,7 @@ function addVideo(slide, layer, context) {
   }
   const media = context.mediaByLayer && context.mediaByLayer.get(layer.id);
   if (!media) fail(`${layer.id} has no validated media binding`);
+  if (media.externalGenerationVerified !== true) fail(`${layer.id} has no verified external video generation binding`);
   slide.addMedia({
     ...box(layer.box, `${layer.id}.box`),
     ...objectMetadata(layer),

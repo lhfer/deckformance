@@ -46,7 +46,7 @@ async function assertReleasePreflight(root, release, dependencies = {}) {
     fail(`${release} release preflight is blocked; resolve every required runtime and contract failure before publication`);
   }
   if (result.status === "degraded") {
-    (dependencies.warnImpl || console.error)(`${release} release preflight is degraded; publication is limited to the validated fixed-media path and no missing capability was substituted`);
+    (dependencies.warnImpl || console.error)(`${release} release preflight is degraded; publication still requires strict external generate-video evidence for every dynamic slide and no missing capability may be substituted`);
   }
   return result;
 }

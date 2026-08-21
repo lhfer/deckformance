@@ -112,6 +112,7 @@
       }
     },
     "motionPlan": {
+      "description": "Video direction and playback intent supplied to an external video-generation model and the PPTX timing builder. It never synthesizes video bytes.",
       "type": "object",
       "additionalProperties": false,
       "required": ["durationSeconds", "loopPolicy", "finalHoldSeconds", "beats"],
