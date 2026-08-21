@@ -1,7 +1,5 @@
 "use strict";
 
-const { lineWidthPt } = require("./typography");
-
 const TEMPLATE_ID = "felt_editorial_split_master";
 const MEDIA_SIDES = Object.freeze(["media-left", "media-right"]);
 const ALLOWED_INPUT_KEYS = Object.freeze([
@@ -56,6 +54,26 @@ function detectProtectedPhrases(value, options = {}) {
     }
   }
   return spans.sort((left, right) => left.start - right.start || (right.end - right.start) - (left.end - left.start));
+}
+
+function characterWidthEm(character) {
+  if (character === "\t") return 1.36;
+  if (/\s/u.test(character)) return 0.36;
+  if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(character)) return 1.05;
+  if (/\p{Extended_Pictographic}/u.test(character)) return 1.15;
+  if (/[MW@#%&]/u.test(character)) return 0.92;
+  if (/[A-Z]/u.test(character)) return 0.78;
+  if (/[a-z0-9]/u.test(character)) return 0.68;
+  if (/[-–—_+=/\\|]/u.test(character)) return 0.62;
+  if (/\p{Punctuation}/u.test(character)) return 0.5;
+  return 0.78;
+}
+
+function lineWidthPt(value, fontSize, letterSpacing) {
+  const items = graphemeRecords(value).map((item) => item.text);
+  if (!items.length) return 0;
+  return items.reduce((sum, character) => sum + characterWidthEm(character) * fontSize, 0)
+    + Math.max(0, items.length - 1) * letterSpacing;
 }
 
 function fail(message) {
