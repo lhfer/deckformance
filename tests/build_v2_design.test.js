@@ -286,7 +286,7 @@ function mediaDescriptor(filePath, relativePath, width, height, extra = {}) {
   };
 }
 
-test("v2 design plan, hash-bound media manifest, Hybrid builder, and autoplay package form one candidate chain", async (t) => {
+test("synthetic assembly fixture (not live provider proof) forms one v2 Hybrid candidate chain", async (t) => {
   const fixture = makeV2Fixture("candidate-chain");
   t.after(() => fs.rmSync(fixture.jobDir, { recursive: true, force: true }));
   let result = run(COMPILE, [fixture.jobDir]);
@@ -315,7 +315,7 @@ test("v2 design plan, hash-bound media manifest, Hybrid builder, and autoplay pa
   const video = mediaDescriptor(videoPath, "videos/01.mp4", 1080, 1080, {
     mime: "video/mp4", durationSeconds: 6, fps: 30, codec: "h264", pixelFormat: "yuv420p", muted: true, audioStreamCount: 0,
   });
-  fs.writeFileSync(path.join(fixture.jobDir, "qa", "local-provider.js"), "module.exports = 'local-import';\n");
+  fs.writeFileSync(path.join(fixture.jobDir, "qa", "local-provider.js"), "module.exports = 'test-external-model';\n");
   const providerImpl = "qa/local-provider.js";
   const posterProvider = createHashBoundReceipt({
     root: fixture.jobDir,
@@ -333,13 +333,21 @@ test("v2 design plan, hash-bound media manifest, Hybrid builder, and autoplay pa
   const videoProvider = createHashBoundReceipt({
     root: fixture.jobDir,
     kind: "provider",
-    producer: { name: "local-import", version: "1" },
+    producer: { name: "test-external-model", version: "fixture-1" },
     implementationFiles: [providerImpl],
     inputs: [poster.path],
     outputs: [video.path],
     metadata: {
-      provider: "local-import", providerVersion: "1", model: "local-file", operation: "import-video",
-      promptSha256: HASH, seed: null, requestId: "local-video-01", durationMs: 0, cost: null, providerMetadata: {},
+      contractVersion: "deckformance.provider-video/1",
+      provider: "test-external-model", providerVersion: "fixture-1", providerClass: "external-video-generation-model",
+      adapterClass: "SyntheticAssemblyFixtureAdapter",
+      transport: "host", model: "synthetic-assembly-fixture", operation: "generate-video",
+      promptSha256: HASH, motionPlanSha256: dynamic.motionPlan.planSha256, generationRequestSha256: HASH,
+      slideId: dynamic.id, layerId: videoLayer.id,
+      seed: null, requestId: "fixture-video-01", durationMs: 1, cost: null,
+      providerMetadata: {},
+      outputMp4: { path: video.path, sha256: video.sha256, bytes: video.bytes },
+      mediaContractValidated: true,
     },
     createdAt: "2026-08-20T20:51:00.000Z",
   });
@@ -494,6 +502,45 @@ test("v2 design plan, hash-bound media manifest, Hybrid builder, and autoplay pa
   const unboundProviderErrors = [];
   validateMediaEvidence(fixture.jobDir, design, unboundProviderManifest, null, unboundProviderErrors);
   assert.ok(unboundProviderErrors.some((error) => error.code === "PROVIDER_INPUT_BINDING"));
+  assert.ok(unboundProviderErrors.some((error) => error.code === "EXTERNAL_VIDEO_PROVIDER"), "import-video must not satisfy the external model boundary");
+
+  const mismatchedOutputProvider = createHashBoundReceipt({
+    root: fixture.jobDir,
+    kind: "provider",
+    producer: { name: "test-external-model", version: "fixture-1" },
+    implementationFiles: [providerImpl],
+    inputs: [poster.path],
+    outputs: [video.path],
+    metadata: {
+      contractVersion: "deckformance.provider-video/1",
+      provider: "test-external-model", providerVersion: "fixture-1", providerClass: "external-video-generation-model",
+      adapterClass: "SyntheticAssemblyFixtureAdapter",
+      transport: "api", model: "synthetic-assembly-fixture", operation: "generate-video",
+      promptSha256: HASH, motionPlanSha256: dynamic.motionPlan.planSha256, generationRequestSha256: HASH,
+      slideId: dynamic.id, layerId: videoLayer.id,
+      seed: null, requestId: "fixture-mismatched-output", durationMs: 1, cost: null,
+      providerMetadata: {},
+      outputMp4: { path: video.path, sha256: HASH, bytes: video.bytes },
+      mediaContractValidated: true,
+    },
+    createdAt: "2026-08-20T20:52:30.000Z",
+  });
+  const mismatchedOutputRelative = "qa/01/mismatched-output-provider.json";
+  const mismatchedOutputHash = writeJson(path.join(fixture.jobDir, ...mismatchedOutputRelative.split("/")), mismatchedOutputProvider);
+  const mismatchedOutputManifest = structuredClone(manifest);
+  mismatchedOutputManifest.slides[0].providerReceipts.video = { path: mismatchedOutputRelative, sha256: mismatchedOutputHash };
+  mismatchedOutputManifest.slides[0].qa.binding.videoProviderReceiptSha256 = mismatchedOutputHash;
+  const mismatchedOutputErrors = [];
+  validateMediaEvidence(fixture.jobDir, design, mismatchedOutputManifest, null, mismatchedOutputErrors);
+  assert.ok(mismatchedOutputErrors.some((error) => error.code === "EXTERNAL_VIDEO_PROVIDER"), "metadata.outputMp4 must match the canonical MP4 descriptor");
+
+  const posterAsVideoManifest = structuredClone(manifest);
+  posterAsVideoManifest.slides[0].providerReceipts.video = { path: posterProviderRelative, sha256: posterProviderHash };
+  posterAsVideoManifest.slides[0].qa.binding.videoProviderReceiptSha256 = posterProviderHash;
+  const posterAsVideoErrors = [];
+  validateMediaEvidence(fixture.jobDir, design, posterAsVideoManifest, null, posterAsVideoErrors);
+  assert.ok(posterAsVideoErrors.some((error) => error.code === "PROVIDER_OUTPUT_BINDING"));
+  assert.ok(posterAsVideoErrors.some((error) => error.code === "EXTERNAL_VIDEO_PROVIDER"), "poster receipt must not substitute for an external video receipt");
 
   const incompleteProvider = createHashBoundReceipt({
     root: fixture.jobDir,
@@ -574,6 +621,38 @@ test("v2 design plan, hash-bound media manifest, Hybrid builder, and autoplay pa
     if (fs.existsSync(captureRoot)) throw new Error(`DECKFORMANCE_CAPTURE_V2_JOB target already exists: ${captureRoot}`);
     fs.cpSync(fixture.jobDir, captureRoot, { recursive: true, errorOnExist: true });
   }
+
+  const manifestPath = path.join(fixture.jobDir, "asset-manifest.json");
+  const canonicalManifestBytes = fs.readFileSync(manifestPath);
+  const missingReceiptManifest = structuredClone(manifest);
+  delete missingReceiptManifest.slides[0].providerReceipts.video;
+  writeJson(manifestPath, missingReceiptManifest);
+  const missingReceiptOutput = path.join(fixture.jobDir, "build", "missing-provider-receipt.pptx");
+  result = run(BUILD_V2, [fixture.jobDir, missingReceiptOutput, "--release", "candidate"]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /providerReceipts.*required property.*video|providerReceipts\/video/i);
+  assert.equal(fs.existsSync(missingReceiptOutput), false);
+  fs.writeFileSync(manifestPath, canonicalManifestBytes);
+
+  writeJson(manifestPath, unboundProviderManifest);
+  result = run(COMPILE_DECK, [fixture.jobDir]);
+  assert.equal(result.status, 0, result.stderr);
+  const importVideoOutput = path.join(fixture.jobDir, "build", "import-video-substitute.pptx");
+  result = run(BUILD_V2, [fixture.jobDir, importVideoOutput, "--release", "candidate"]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /external video generation model|generate-video|provider-receipt/i);
+  assert.equal(fs.existsSync(importVideoOutput), false);
+  fs.writeFileSync(manifestPath, canonicalManifestBytes);
+  fs.writeFileSync(deckPath, firstDeckBytes);
+
+  const canonicalVideoBytes = fs.readFileSync(videoPath);
+  fs.unlinkSync(videoPath);
+  const motionOnlyOutput = path.join(fixture.jobDir, "build", "motion-plan-without-mp4.pptx");
+  result = run(BUILD_V2, [fixture.jobDir, motionOnlyOutput, "--release", "candidate"]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /video.*not found|receipt.*video|ENOENT/i);
+  assert.equal(fs.existsSync(motionOnlyOutput), false);
+  fs.writeFileSync(videoPath, canonicalVideoBytes);
 
   result = run(BUILD_V2, [fixture.jobDir, path.join(fixture.jobDir, "build", "final.staging.pptx"), "--release", "final"]);
   assert.notEqual(result.status, 0);

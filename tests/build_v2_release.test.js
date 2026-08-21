@@ -298,7 +298,7 @@ test("candidate release accepts only candidate.staging, revalidates directly, an
   assert.equal(renderRecheckCalls[1].sourceArtifactPath, "candidate.pptx");
 });
 
-test("release preflight blocks publication failures but permits an explicit degraded fixed-media path", async () => {
+test("release preflight blocks failures and never treats degraded state as external-video substitution", async () => {
   await assert.rejects(
     () => assertReleasePreflight("/tmp/unused", "candidate", {
       preflightImpl: async () => ({ status: "blocked" }),
@@ -312,7 +312,7 @@ test("release preflight blocks publication failures but permits an explicit degr
   });
   assert.equal(result.status, "degraded");
   assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /fixed-media path/);
+  assert.match(warnings[0], /strict external generate-video evidence/);
 });
 
 test("direct report comparison permits only the staging-to-candidate path change during exact-byte promotion", () => {

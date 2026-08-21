@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 "use strict";
 
+// Pure contract code: motionPlan describes external-model direction and PPTX
+// playback timing. This module never creates, edits, or writes video bytes.
+
 const crypto = require("node:crypto");
 
 const MOTION_PLAN_VERSION = "2.0.0";
