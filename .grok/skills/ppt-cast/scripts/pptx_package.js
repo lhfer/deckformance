@@ -58,6 +58,25 @@ function findVideoShapeIds(slideXml) {
   return findVideoShapes(slideXml).map((shape) => shape.id);
 }
 
+function validateFeltPanelOutlines(slideXml, slideNumber) {
+  const errors = [];
+  const panels = [];
+  for (const shape of slideXml.match(/<p:sp\b[\s\S]*?<\/p:sp>/g) || []) {
+    const shapeName = shape.match(/<p:cNvPr\b[^>]*\bname="([^"]+)"/);
+    const name = shapeName ? shapeName[1] : "";
+    if (!/^felt-panel(?:-|$)/.test(name)) continue;
+    const shapeProperties = shape.match(/<p:spPr\b[\s\S]*?<\/p:spPr>/);
+    const line = shapeProperties && shapeProperties[0].match(/<a:ln\b[\s\S]*?<\/a:ln>|<a:ln\b[^>]*\/>/);
+    const lineXml = line ? line[0] : "";
+    const hasNoFill = /<a:noFill\b/.test(lineXml);
+    const hasVisibleFill = /<a:(?:solidFill|gradFill|pattFill|blipFill|grpFill)\b/.test(lineXml);
+    const outlineSafe = !lineXml || (hasNoFill && !hasVisibleFill);
+    panels.push({ name, outlineSafe });
+    if (!outlineSafe) errors.push(`slide ${slideNumber} felt panel "${name}" has a visible/default outline`);
+  }
+  return { errors, panels, valid: errors.length === 0 };
+}
+
 function timingXml(shapeId, durationMs, volume) {
   const duration = Math.max(1, Math.round(durationMs));
   const vol = Math.max(0, Math.min(100000, Math.round(volume)));
@@ -154,6 +173,8 @@ async function validatePackageBuffer(buffer, options = {}) {
   const expectedContentPages =
     options.expectedContentPages === undefined ? expectedVideoSlides.length : options.expectedContentPages;
   let relationshipsValid = true;
+  let feltPanelOutlinesValid = true;
+  let feltPanelCount = 0;
   let posterCount = 0;
   let timingCount = 0;
   const contentTypesEntry = zip.file("[Content_Types].xml");
@@ -327,6 +348,13 @@ async function validatePackageBuffer(buffer, options = {}) {
 
   for (const slidePart of slideParts) {
     const slideNumber = Number(slidePart.match(/slide(\d+)\.xml$/)[1]);
+    const slideXml = await zip.file(slidePart).async("string");
+    const panelQa = validateFeltPanelOutlines(slideXml, slideNumber);
+    feltPanelCount += panelQa.panels.length;
+    if (!panelQa.valid) {
+      feltPanelOutlinesValid = false;
+      errors.push(...panelQa.errors);
+    }
     const relsPart = `ppt/slides/_rels/slide${slideNumber}.xml.rels`;
     const relsEntry = zip.file(relsPart);
     if (!relsEntry) {
@@ -366,6 +394,8 @@ async function validatePackageBuffer(buffer, options = {}) {
     embeddedMediaBytes,
     maxEmbeddedMediaBytes,
     relationshipsValid,
+    feltPanelCount,
+    feltPanelOutlinesValid,
     mimeTypesValid,
     aspectRatiosValid: options.aspectRatiosValid !== false,
     release: options.release || null,
@@ -385,5 +415,6 @@ module.exports = {
   resolveRelationshipPart,
   sha256,
   timingXml,
+  validateFeltPanelOutlines,
   validatePackageBuffer,
 };

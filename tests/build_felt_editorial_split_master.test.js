@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const JSZip = require(path.resolve(__dirname, "../.grok/skills/ppt-cast/scripts/node_modules/jszip"));
 
 const {
   body_shaping_for_felt_master,
@@ -13,7 +14,9 @@ const {
   felt_editorial_split_master,
   geometryForFeltMaster,
   headline_shaping_for_felt_master,
+  panelShapeConfigForFeltMaster,
 } = require("../.grok/skills/ppt-cast/scripts/felt_editorial_split_master");
+const { validatePackageBuffer } = require("../.grok/skills/ppt-cast/scripts/pptx_package");
 
 test("defines one master with two strict mirror variants and three ratio candidates", () => {
   assert.equal(felt_editorial_split_master.id, "felt_editorial_split_master");
@@ -47,6 +50,56 @@ test("media-left and media-right are exact geometry mirrors", () => {
   assert.ok(left.mediaContract.renderedAspect > 1.17 && left.mediaContract.renderedAspect < 1.20);
   assert.equal(left.mediaContract.environment.required, true);
   assert.deepEqual(left.mediaContract.environment.depthLayers, ["foreground", "midground", "background"]);
+});
+
+test("panel treatment forbids the zero-width solid outline that PowerPoint renders as a hairline", () => {
+  const left = geometryForFeltMaster({ slideWidth: 1280, slideHeight: 720, mediaSide: "media-left", ratio: "B" });
+  const right = geometryForFeltMaster({ slideWidth: 1280, slideHeight: 720, mediaSide: "media-right", ratio: "B" });
+  assert.deepEqual(left.panelTreatment, {
+    fill: "#232424",
+    line: { style: "solid", fill: "none", width: 0 },
+    powerPointHairlineSafe: true,
+  });
+  assert.deepEqual(right.panelTreatment, left.panelTreatment);
+  assert.deepEqual(felt_editorial_split_master.panelTreatment.line, { style: "solid", fill: "none", width: 0 });
+  assert.notEqual(felt_editorial_split_master.panelTreatment.line.fill, felt_editorial_split_master.palette.panel);
+  assert.deepEqual(panelShapeConfigForFeltMaster(left.panel, "felt-panel-test"), {
+    geometry: "rect",
+    name: "felt-panel-test",
+    position: left.panel,
+    fill: "#232424",
+    line: { style: "solid", fill: "none", width: 0 },
+  });
+  assert.equal(panelShapeConfigForFeltMaster(left.panel).name, "felt-panel");
+});
+
+async function minimalFeltPanelPackage(lineXml) {
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", '<?xml version="1.0"?><Types><Default Extension="png" ContentType="image/png"/><Default Extension="mp4" ContentType="video/mp4"/></Types>');
+  zip.file("ppt/slides/slide1.xml", `<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="2" name="felt-panel-01"/></p:nvSpPr><p:spPr>${lineXml}</p:spPr></p:sp></p:spTree></p:cSld></p:sld>`);
+  zip.file("ppt/slides/_rels/slide1.xml.rels", '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/></Relationships>');
+  zip.file("ppt/notesSlides/notesSlide1.xml", '<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><a:t xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">[Sources]</a:t></p:notes>');
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+test("package validation rejects PowerPoint-visible felt panel outlines after export", async () => {
+  const safe = await validatePackageBuffer(await minimalFeltPanelPackage('<a:ln w="0"><a:noFill/></a:ln>'), {
+    videoSlides: [],
+    expectedMediaCount: 0,
+    expectedContentPages: 0,
+  });
+  assert.equal(safe.valid, true, safe.errors.join("\n"));
+  assert.equal(safe.feltPanelCount, 1);
+  assert.equal(safe.feltPanelOutlinesValid, true);
+
+  const unsafe = await validatePackageBuffer(await minimalFeltPanelPackage('<a:ln w="0"><a:solidFill><a:srgbClr val="232424"/></a:solidFill></a:ln>'), {
+    videoSlides: [],
+    expectedMediaCount: 0,
+    expectedContentPages: 0,
+  });
+  assert.equal(unsafe.valid, false);
+  assert.equal(unsafe.feltPanelOutlinesValid, false);
+  assert.match(unsafe.errors.join("\n"), /slide 1 felt panel "felt-panel-01" has a visible\/default outline/u);
 });
 
 test("headline shaping preserves semantic phrases and produces multiple eligible candidates", () => {
@@ -98,6 +151,7 @@ test("model exposes only the focused template inputs and stable vertical zones",
   });
   assert.equal(model.templateId, "felt_editorial_split_master");
   assert.equal(model.geometry.variant, "media-right");
+  assert.deepEqual(model.panelShape.line, { style: "solid", fill: "none", width: 0 });
   assert.ok(model.geometry.zones.header.top < model.geometry.zones.body.top);
   assert.ok(model.geometry.zones.body.top < model.geometry.zones.closing.top);
   assert.equal(model.geometry.edgeTreatment.type, "source-derived-alpha-mask");

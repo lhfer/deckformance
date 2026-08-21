@@ -45,7 +45,7 @@ The master has one 2.08:1 centered card and two strict mirrors only: `media-left
 
 Supported page inputs are intentionally narrow: `mediaSide`, `eyebrowOrIcon`, `pageNumber`, `headline`, `body`, `closingLine`, `videoPoster`, `videoSlot`, and optional `characterSet`. `characterSet.referenceImages` accepts one or two job-relative user uploads; there is no default mascot. Preserve the uploaded identity while recomposing the felt miniature scene, and never treat sample characters as template identity.
 
-Before rendering, copy the packaged `.grok/skills/ppt-cast/assets/felt-edge-negative-mask.png` to `<job>/assets/felt-edge-negative-mask.png`. Apply it as the card-level negative alpha overlay so the warm canvas color remains adaptive around both panel and media. Do not replace it with a sawtooth shape, generic scallop, or two independently rounded rectangles.
+Before rendering, copy the packaged `.grok/skills/ppt-cast/assets/felt-edge-negative-mask.png` to `<job>/assets/felt-edge-negative-mask.png`. Apply it as the card-level negative alpha overlay so the warm canvas color remains adaptive around both panel and media. Build the charcoal panel from `model.panelShape` (or `panelShapeConfigForFeltMaster`) rather than reconstructing its stroke: it uses a true no-fill outline (`fill: "none"`, `width: 0`). Never give the panel a zero-width solid charcoal line; PowerPoint exposes that as a one-pixel hairline outside the mask. As a final package gate, inspect every `felt-panel-*` in the exported PPTX and require `<a:noFill/>` with no solid line fill. Do not replace the mask with a sawtooth shape, generic scallop, or two independently rounded rectangles.
 
 ## v2 default workflow
 
