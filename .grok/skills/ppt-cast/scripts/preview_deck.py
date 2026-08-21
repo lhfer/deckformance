@@ -34,12 +34,17 @@ def load_font(
             "/System/Library/Fonts/STHeiti Medium.ttc" if bold else "/System/Library/Fonts/STHeiti Light.ttc",
             "/System/Library/Fonts/Hiragino Sans GB.ttc",
             "/System/Library/Fonts/STHeiti Medium.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc",
         )
     else:
         candidates = (
             "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
             "/Library/Fonts/Arial Bold.ttf" if bold else "/Library/Fonts/Arial.ttf",
             "/System/Library/Fonts/Helvetica.ttc",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+            "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
         )
     for p in candidates:
         if Path(p).exists():
@@ -47,7 +52,7 @@ def load_font(
                 return ImageFont.truetype(p, size)
             except OSError:
                 continue
-    return ImageFont.load_default()
+    raise RuntimeError("no usable TrueType/OpenType preview font is available")
 
 
 def cover_paste(base: Image.Image, src_path: Path, box: tuple[int, int, int, int]) -> None:
