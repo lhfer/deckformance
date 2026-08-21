@@ -4,8 +4,10 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 const Ajv2020 = require("ajv/dist/2020");
 const addFormats = require("ajv-formats");
+const { probe, runTool } = require("./media_contract");
 
 const SCHEMA_VERSION = "1.0.0";
 const STAGES = Object.freeze([
@@ -87,6 +89,62 @@ const QA_CHECKS = Object.freeze([
   "noReadableText",
   "slotCropSafe",
 ]);
+
+const decodedAssetCache = new Set();
+const crcTable = new Uint32Array(256);
+for (let index = 0; index < 256; index += 1) {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  crcTable[index] = value >>> 0;
+}
+
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function decodePng(buffer) {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (buffer.length < 33 || !buffer.subarray(0, 8).equals(signature)) throw new Error("invalid PNG signature");
+  let offset = 8;
+  let ihdr = null;
+  let ended = false;
+  const idat = [];
+  while (offset + 12 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const end = offset + 12 + length;
+    if (end > buffer.length) throw new Error("truncated PNG chunk");
+    const type = buffer.toString("ascii", offset + 4, offset + 8);
+    const data = buffer.subarray(offset + 8, offset + 8 + length);
+    const declaredCrc = buffer.readUInt32BE(offset + 8 + length);
+    const actualCrc = crc32(Buffer.concat([Buffer.from(type, "ascii"), data]));
+    if (declaredCrc !== actualCrc) throw new Error(`${type} CRC mismatch`);
+    if (type === "IHDR") ihdr = Buffer.from(data);
+    else if (type === "IDAT") idat.push(Buffer.from(data));
+    else if (type === "IEND") {
+      ended = true;
+      break;
+    }
+    offset = end;
+  }
+  if (!ihdr || ihdr.length !== 13 || idat.length === 0 || !ended) throw new Error("PNG is missing IHDR, IDAT, or IEND");
+  const width = ihdr.readUInt32BE(0);
+  const height = ihdr.readUInt32BE(4);
+  const bitDepth = ihdr[8];
+  const colorType = ihdr[9];
+  const interlace = ihdr[12];
+  const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[colorType];
+  if (!channels || width < 1 || height < 1) throw new Error("unsupported or empty PNG image");
+  const inflated = zlib.inflateSync(Buffer.concat(idat));
+  if (interlace === 0) {
+    const rowBytes = Math.ceil((width * channels * bitDepth) / 8);
+    if (inflated.length !== (rowBytes + 1) * height) throw new Error("PNG scanline payload length mismatch");
+  } else if (inflated.length === 0) {
+    throw new Error("empty interlaced PNG payload");
+  }
+  return { width, height };
+}
 
 function issue(errors, code, pointer, message) {
   errors.push({ code, path: pointer, message });
@@ -288,9 +346,34 @@ function validateHashFile(jobDir, descriptor, pointer, errors, kind = "file") {
         issue(errors, "DIMENSION_MISMATCH", pointer, `declared ${descriptor.width}x${descriptor.height}, PNG is ${width}x${height}`);
       }
     }
+    if (!decodedAssetCache.has(`png:${actualHash}`)) {
+      try {
+        const decoded = decodePng(fs.readFileSync(filePath));
+        if (decoded.width !== descriptor.width || decoded.height !== descriptor.height) {
+          issue(errors, "CORRUPT_PNG", `${pointer}.path`, "PNG is not fully decodable at the declared dimensions");
+        } else {
+          decodedAssetCache.add(`png:${actualHash}`);
+        }
+      } catch (error) {
+        issue(errors, "CORRUPT_PNG", `${pointer}.path`, `PNG decode failed: ${error.message}`);
+      }
+    }
   } else if (kind === "mp4") {
     if (head.length < 12 || head.toString("ascii", 4, 8) !== "ftyp") {
       issue(errors, "CORRUPT_MP4", `${pointer}.path`, "file has no ISO BMFF ftyp box");
+    } else if (!decodedAssetCache.has(`mp4:${actualHash}`)) {
+      try {
+        const info = probe(filePath);
+        const videoStream = (info.streams || []).find((stream) => stream.codec_type === "video");
+        if (!videoStream || !Number.isFinite(Number(info.format && info.format.duration)) || Number(info.format.duration) <= 0) {
+          issue(errors, "CORRUPT_MP4", `${pointer}.path`, "MP4 must contain a decodable video stream with positive duration");
+        } else {
+          runTool("ffmpeg", ["-v", "error", "-i", filePath, "-f", "null", "-"]);
+          decodedAssetCache.add(`mp4:${actualHash}`);
+        }
+      } catch (error) {
+        issue(errors, "CORRUPT_MP4", `${pointer}.path`, `MP4 decode failed: ${error.message}`);
+      }
     }
   } else if (kind === "pptx") {
     if (head.length < 4 || !head.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) {
@@ -298,6 +381,15 @@ function validateHashFile(jobDir, descriptor, pointer, errors, kind = "file") {
     }
   }
   return { filePath, actualHash, bytes: stat.size };
+}
+
+function parseRate(value) {
+  if (typeof value !== "string") return NaN;
+  const match = value.match(/^(\d+(?:\.\d+)?)(?:\/(\d+(?:\.\d+)?))?$/);
+  if (!match) return NaN;
+  const numerator = Number(match[1]);
+  const denominator = match[2] === undefined ? 1 : Number(match[2]);
+  return denominator > 0 ? numerator / denominator : NaN;
 }
 
 function validateBrief(jobDir, brief, jobId, errors) {
@@ -913,8 +1005,10 @@ function validateRenderQa(jobDir, renderQa, artifactAsset, slideCount, expectedI
   if (indexAsset) {
     try {
       const index = loadJson(indexAsset.filePath);
-      if (index.version !== 1 || index.producer !== "ppt-cast/render-pptx-qa@1") {
-        issue(errors, "RENDER_INDEX", `${pointer}.renderIndex`, "must be produced by ppt-cast/render-pptx-qa@1");
+      const legacyIndex = index.version === 1 && index.producer === "ppt-cast/render-pptx-qa@1";
+      const receiptIndex = index.version === 2 && index.producer === "ppt-cast/render-pptx-qa@2";
+      if (!legacyIndex && !receiptIndex) {
+        issue(errors, "RENDER_INDEX", `${pointer}.renderIndex`, "must be produced by a supported ppt-cast/render-pptx-qa producer");
       }
       if (index.artifactPath !== expectedArtifactPath || index.artifactSha256 !== renderQa.artifactSha256) {
         issue(errors, "STALE_RENDER_INDEX", `${pointer}.renderIndex`, "must bind the exact staging PPTX path and hash");
@@ -925,8 +1019,20 @@ function validateRenderQa(jobDir, renderQa, artifactAsset, slideCount, expectedI
       if (!sameJson(index.renderedSlides, renderQa.renderedSlides)) {
         issue(errors, "STALE_RENDER_INDEX", `${pointer}.renderedSlides`, "must exactly copy the bound render index descriptors");
       }
-      if (path.basename(String(index.renderer || "")) !== "render_slides.py" || path.basename(String(index.slidesTest || "")) !== "slides_test.py") {
-        issue(errors, "RENDER_INDEX", `${pointer}.renderIndex`, "must record the target presentation renderer and overflow checker");
+      if (legacyIndex) {
+        if (path.basename(String(index.renderer || "")) !== "render_slides.py" || path.basename(String(index.slidesTest || "")) !== "slides_test.py") {
+          issue(errors, "RENDER_INDEX", `${pointer}.renderIndex`, "must record the target presentation renderer and overflow checker");
+        }
+      } else if (receiptIndex) {
+        for (const [key, expectedName] of [["renderer", "render_slides.py"], ["slidesTest", "slides_test.py"]]) {
+          const receipt = index[key];
+          if (!isObject(receipt) || path.basename(String(receipt.name || "")) !== expectedName || !validHash(receipt.sha256)) {
+            issue(errors, "RENDER_IMPLEMENTATION_RECEIPT", `${pointer}.renderIndex.${key}`, `must bind ${expectedName} by name and SHA-256`);
+          }
+        }
+        if (!validHash(index.producerSha256) || !isObject(index.runtime) || !isObject(index.runtime.python) || !isNonEmptyString(index.runtime.python.version)) {
+          issue(errors, "RENDER_RUNTIME_RECEIPT", `${pointer}.renderIndex`, "v2 render evidence must bind the producer and Python runtime");
+        }
       }
     } catch (error) {
       issue(errors, "RENDER_INDEX", `${pointer}.renderIndex`, `invalid render index JSON: ${error.message}`);
@@ -1036,7 +1142,19 @@ function validatePptxRelease(jobDir, job, content, currentHashes, level, errors)
   }
   if (finalAsset && verification.artifactSha256 !== finalAsset.actualHash) issue(errors, "STALE_POWERPOINT_VERIFICATION", "job.release.final.powerPointVerification.artifactSha256", "must bind the tested final.pptx hash");
   if (typeof verification.capturePath !== "string" || !verification.capturePath.endsWith(".mp4")) issue(errors, "POWERPOINT_CAPTURE", "job.release.final.powerPointVerification.capturePath", "must be an .mp4 capture");
-  validateHashFile(jobDir, { path: verification.capturePath, sha256: verification.captureSha256 }, "job.release.final.powerPointVerification.capture", errors, "mp4");
+  const captureAsset = validateHashFile(jobDir, { path: verification.capturePath, sha256: verification.captureSha256 }, "job.release.final.powerPointVerification.capture", errors, "mp4");
+  if (captureAsset) {
+    try {
+      const info = probe(captureAsset.filePath);
+      const stream = (info.streams || []).find((item) => item.codec_type === "video");
+      const fps = stream ? Math.max(parseRate(stream.avg_frame_rate), parseRate(stream.r_frame_rate)) : NaN;
+      if (!stream || Number(stream.width) < 1920 || Number(stream.height) < 1080 || !Number.isFinite(fps) || fps < 29) {
+        issue(errors, "POWERPOINT_CAPTURE", "job.release.final.powerPointVerification.capture", "capture must contain decodable video at 1920x1080 or higher and at least 29 fps");
+      }
+    } catch (error) {
+      issue(errors, "POWERPOINT_CAPTURE", "job.release.final.powerPointVerification.capture", `capture probe failed: ${error.message}`);
+    }
+  }
   const expectedTestedIds = (content && content.slides || []).filter((slide) => slide.videoRequired === true).map((slide) => slide.id).sort();
   const actualTestedIds = Array.isArray(verification.testedSlideIds) ? [...verification.testedSlideIds].sort() : [];
   if (!sameJson(actualTestedIds, expectedTestedIds)) issue(errors, "POWERPOINT_SLIDE_COVERAGE", "job.release.final.powerPointVerification.testedSlideIds", "must cover every dynamic slide ID exactly once");

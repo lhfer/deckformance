@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ppt-cast.local/schemas/v2/typography.schema.json",
+  "title": "ppt-cast v2 typography system",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "measurementPolicy", "tokens", "cjk"],
+  "properties": {
+    "schemaVersion": { "const": "2.0.0" },
+    "measurementPolicy": { "const": "fail-closed" },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display", "headline", "subhead", "body", "caption", "data", "number"],
+      "properties": {
+        "display": {
+          "allOf": [
+            { "$ref": "#/$defs/token" },
+            { "properties": { "size": { "properties": { "min": { "minimum": 50 } } } } }
+          ]
+        },
+        "headline": {
+          "allOf": [
+            { "$ref": "#/$defs/token" },
+            { "properties": { "size": { "properties": { "min": { "minimum": 35 } } } } }
+          ]
+        },
+        "subhead": {
+          "allOf": [
+            { "$ref": "#/$defs/token" },
+            { "properties": { "size": { "properties": { "min": { "minimum": 24 } } } } }
+          ]
+        },
+        "body": {
+          "allOf": [
+            { "$ref": "#/$defs/token" },
+            { "properties": { "size": { "properties": { "min": { "minimum": 16 } } } } }
+          ]
+        },
+        "caption": { "$ref": "#/$defs/token" },
+        "data": {
+          "allOf": [
+            { "$ref": "#/$defs/token" },
+            { "properties": { "size": { "properties": { "min": { "minimum": 24 } } } } }
+          ]
+        },
+        "number": {
+          "allOf": [
+            { "$ref": "#/$defs/token" },
+            { "properties": { "size": { "properties": { "min": { "minimum": 35 } } } } }
+          ]
+        }
+      }
+    },
+    "cjk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kinsoku", "orphanControl", "mixedScript"],
+      "properties": {
+        "kinsoku": { "const": true },
+        "orphanControl": { "const": true },
+        "mixedScript": { "enum": ["balanced", "cjk-first", "latin-first"] }
+      }
+    }
+  },
+  "$defs": {
+    "token": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "fallbacks", "weight", "size", "lineHeight", "letterSpacing", "maxLines"],
+      "properties": {
+        "family": { "type": "string", "minLength": 1 },
+        "fallbacks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "weight": { "type": "integer", "minimum": 100, "maximum": 900, "multipleOf": 100 },
+        "size": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "preferred", "max"],
+          "properties": {
+            "min": { "type": "number", "minimum": 8, "maximum": 96 },
+            "preferred": { "type": "number", "minimum": 8, "maximum": 120 },
+            "max": { "type": "number", "minimum": 8, "maximum": 144 }
+          }
+        },
+        "lineHeight": { "type": "number", "minimum": 1, "maximum": 1.8 },
+        "letterSpacing": { "type": "number", "minimum": -1, "maximum": 4 },
+        "maxLines": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    }
+  }
+}

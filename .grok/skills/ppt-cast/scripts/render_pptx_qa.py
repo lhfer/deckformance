@@ -22,6 +22,9 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+import PIL
+from PIL import Image, UnidentifiedImageError
+
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 SLIDE_RE = re.compile(r"^ppt/slides/slide([1-9][0-9]*)\.xml$")
@@ -83,10 +86,54 @@ def png_dimensions(file_path: Path) -> tuple[int, int]:
         header = handle.read(24)
     if len(header) < 24 or header[:8] != PNG_SIGNATURE or header[12:16] != b"IHDR":
         fail(f"renderer did not produce a true PNG: {file_path}")
-    width, height = struct.unpack(">II", header[16:24])
-    if width <= 0 or height <= 0:
+    header_width, header_height = struct.unpack(">II", header[16:24])
+    try:
+        with Image.open(file_path) as image:
+            if image.format != "PNG":
+                fail(f"renderer output is not a PNG image: {file_path}")
+            image.verify()
+        with Image.open(file_path) as image:
+            image.load()
+            width, height = image.size
+    except (UnidentifiedImageError, OSError, ValueError) as error:
+        fail(f"renderer produced an undecodable PNG {file_path}: {error}")
+    if width <= 0 or height <= 0 or (width, height) != (header_width, header_height):
         fail(f"invalid rendered PNG dimensions: {file_path}")
     return width, height
+
+
+def executable_receipt(file_path: Path, version: str) -> dict[str, str]:
+    return {
+        "name": file_path.name,
+        "version": version,
+        "sha256": sha256_file(file_path),
+    }
+
+
+def runtime_receipt(args: argparse.Namespace) -> dict[str, object]:
+    python_path = Path(args.python).expanduser().resolve(strict=True)
+    receipt: dict[str, object] = {
+        "python": {
+            "implementation": sys.implementation.name,
+            "version": ".".join(str(part) for part in sys.version_info[:3]),
+            "executable": python_path.name,
+            "sha256": sha256_file(python_path),
+            "pillowVersion": PIL.__version__,
+        }
+    }
+    if args.runtime_node:
+        node = Path(args.runtime_node).expanduser().resolve(strict=True)
+        node_receipt = executable_receipt(node, "runtime")
+        version = subprocess.run(
+            [str(node), "--version"], text=True, capture_output=True, check=False
+        )
+        node_receipt["version"] = (version.stdout or version.stderr or "").strip()
+        receipt["node"] = node_receipt
+    if args.runtime_bin_dir:
+        receipt["binDir"] = Path(args.runtime_bin_dir).expanduser().resolve(strict=True).name
+    if args.runtime_node_modules:
+        receipt["nodeModules"] = Path(args.runtime_node_modules).expanduser().resolve(strict=True).name
+    return receipt
 
 
 def run_checked(
@@ -107,7 +154,9 @@ def main() -> None:
     parser.add_argument("pptx", help="PPTX path relative to job_dir")
     parser.add_argument("output_dir", help="new evidence directory relative to job_dir")
     parser.add_argument("--renderer", required=True, help="target pptx skill render_slides.py")
+    parser.add_argument("--renderer-version", required=True, help="declared renderer implementation or bundle version")
     parser.add_argument("--slides-test", required=True, help="target pptx skill slides_test.py")
+    parser.add_argument("--slides-test-version", required=True, help="declared slides-test implementation or bundle version")
     parser.add_argument("--python", default=sys.executable, help="Python runtime for the target tools")
     parser.add_argument("--runtime-node", help="bundled RUNTIME_NODE returned by workspace dependencies")
     parser.add_argument("--runtime-bin-dir", help="bundled RUNTIME_BIN_DIR returned by workspace dependencies")
@@ -161,6 +210,11 @@ def main() -> None:
         slides = []
         for number, image_path in numbered:
             width, height = png_dimensions(image_path)
+            if width < 1920 or height < 1080:
+                fail(
+                    f"renderer output is below the release evidence floor: "
+                    f"slide {number} is {width}x{height}, expected at least 1920x1080"
+                )
             final_image = output_dir / image_path.name
             relative = final_image.relative_to(job_dir).as_posix()
             slides.append(
@@ -175,15 +229,17 @@ def main() -> None:
             )
 
         index = {
-            "version": 1,
-            "producer": "ppt-cast/render-pptx-qa@1",
+            "version": 2,
+            "producer": "ppt-cast/render-pptx-qa@2",
+            "producerSha256": sha256_file(Path(__file__).resolve(strict=True)),
             "artifactPath": args.pptx,
             "artifactSha256": sha256_file(pptx_path),
             "slideCount": expected_count,
             "overflowPassed": True,
             "renderedSlides": slides,
-            "renderer": renderer.name,
-            "slidesTest": slides_test.name,
+            "renderer": executable_receipt(renderer, args.renderer_version),
+            "slidesTest": executable_receipt(slides_test, args.slides_test_version),
+            "runtime": runtime_receipt(args),
         }
         index_path = temp_dir / "render-index.json"
         index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

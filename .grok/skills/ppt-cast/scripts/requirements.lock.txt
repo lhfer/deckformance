@@ -1,0 +1,3 @@
+# Runtime dependencies for the ppt-cast Python QA helpers.
+# Keep exact versions; CI and doctor verify this lock before formal work.
+Pillow==12.3.0

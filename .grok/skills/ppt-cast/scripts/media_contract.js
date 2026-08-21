@@ -126,7 +126,7 @@ function probe(filePath) {
     "-v",
     "error",
     "-show_entries",
-    "stream=index,codec_type,codec_name,pix_fmt,width,height,sample_aspect_ratio:format=format_name,duration",
+    "stream=index,codec_type,codec_name,pix_fmt,width,height,sample_aspect_ratio,r_frame_rate,avg_frame_rate:format=format_name,duration",
     "-of",
     "json",
     filePath,
@@ -136,6 +136,15 @@ function probe(filePath) {
   } catch (error) {
     throw new Error(`ffprobe returned invalid JSON for ${filePath}: ${error.message}`);
   }
+}
+
+function parseFrameRate(value) {
+  if (typeof value !== "string") return NaN;
+  const match = value.match(/^(\d+(?:\.\d+)?)(?:\/(\d+(?:\.\d+)?))?$/);
+  if (!match) return NaN;
+  const numerator = Number(match[1]);
+  const denominator = match[2] === undefined ? 1 : Number(match[2]);
+  return denominator > 0 ? numerator / denominator : NaN;
 }
 
 function hasPngSignature(filePath) {
@@ -204,6 +213,8 @@ function inspectVideo(filePath, aspect) {
   const stream = streams[0];
   const formatName = String((info.format && info.format.format_name) || "");
   const duration = Number(info.format && info.format.duration);
+  const rates = stream ? [parseFrameRate(stream.avg_frame_rate), parseFrameRate(stream.r_frame_rate)].filter(Number.isFinite) : [];
+  const fps = rates.length ? Math.max(...rates) : NaN;
   if (path.extname(filePath).toLowerCase() !== ".mp4") errors.push("video filename must end in .mp4");
   if (!hasMp4Signature(filePath) || !formatName.split(",").includes("mp4")) {
     errors.push("video must be an MP4 container with an ftyp signature");
@@ -227,13 +238,28 @@ function inspectVideo(filePath, aspect) {
     if (width % 2 || height % 2) errors.push(`video dimensions must be even for yuv420p: ${width}x${height}`);
   }
   if (!Number.isFinite(duration) || duration <= 0) errors.push("video duration must be positive");
+  if (!Number.isFinite(fps) || fps <= 0) errors.push("video frame rate must be positive and readable");
+  try {
+    runTool("ffmpeg", [
+      "-v", "error",
+      "-xerror",
+      "-i", filePath,
+      "-map", "0:v:0",
+      "-f", "null",
+      "-",
+    ], { maxBuffer: 4 * 1024 * 1024 });
+  } catch (error) {
+    errors.push(`video must fully decode from first to last frame: ${error.message}`);
+  }
   return {
     errors,
     width: stream ? Number(stream.width) : null,
     height: stream ? Number(stream.height) : null,
     duration,
+    fps,
     codec: stream ? stream.codec_name : null,
     pixFmt: stream ? stream.pix_fmt : null,
+    audioStreamCount: nonVideoStreams.filter((item) => item.codec_type === "audio").length,
   };
 }
 
@@ -258,6 +284,7 @@ module.exports = {
   hasPngSignature,
   inspectPoster,
   inspectVideo,
+  parseFrameRate,
   parseAspect,
   probe,
   resolveSafeRelative,

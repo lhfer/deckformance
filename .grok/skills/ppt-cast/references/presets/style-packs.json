@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "stylePacks": [
+    {
+      "id": "felt-yarn",
+      "reference": "felt-yarn.style-pack.json",
+      "humanGuide": "felt-yarn.md"
+    },
+    {
+      "id": "clay",
+      "reference": "clay.style-pack.json"
+    },
+    {
+      "id": "paper-cut",
+      "reference": "paper-cut.style-pack.json"
+    },
+    {
+      "id": "cinematic-miniature",
+      "reference": "cinematic-miniature.style-pack.json"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "deckformance.renderer-trust-policy/1",
+  "policyId": "deckformance.renderer-trust.default.v1",
+  "approvedAdapters": [
+    {
+      "id": "openai-presentations-26.819.11345",
+      "renderer": {
+        "name": "render_slides.py",
+        "version": "26.819.11345",
+        "sha256": "sha256:ab4965cd3e7338767c83217780ed0efadc219b38f1ca7e824765400fbcf69705"
+      },
+      "slidesTest": {
+        "name": "slides_test.py",
+        "version": "26.819.11345",
+        "sha256": "sha256:f192e85ba17a9f7634908074e2149a277a30684c0e38d459f9c1d0245bfd6cc1"
+      }
+    }
+  ]
+}

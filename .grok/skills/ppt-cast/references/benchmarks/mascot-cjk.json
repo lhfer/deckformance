@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "benchmarkId": "mascot-cjk",
+  "title": "Chinese mascot, CJK typography, and mixed numeric text",
+  "track": "fixed-media",
+  "status": "defined-unexecuted",
+  "fixturePolicy": {
+    "media": "hash-pinned mascot clips at final slot aspect",
+    "content": "fixed Simplified Chinese headlines, punctuation edge cases, orphan-character cases, Latin acronyms, and large numbers",
+    "fonts": "run only against a recorded font-resolution receipt and exact font-file hashes"
+  },
+  "assertions": [
+    "CJK punctuation rules and orphan control produce no forbidden line starts or isolated terminal characters.",
+    "Display, headline, body, caption, data, and number tokens remain at or above their contractual size floors.",
+    "Mascot identity, silhouette, and action continuity pass all five frame checks.",
+    "Missing required fonts fail closed before media generation or PPTX build."
+  ],
+  "releasePolicy": {
+    "galleryEligible": false,
+    "reason": "The fixed fixture is evidence for typography behavior, not a public success sample by default."
+  }
+}

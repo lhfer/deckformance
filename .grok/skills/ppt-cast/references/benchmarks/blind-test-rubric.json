@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0.0",
+  "rubricId": "deckformance-v1-v2-blind-comparison",
+  "version": "1.0.0",
+  "instructions": [
+    "Review presentation A and presentation B without trying to identify which system produced either artifact.",
+    "Choose the presentation you would prefer to use. A tie is allowed and counts as no v2 preference win at the release gate.",
+    "Score both presentations independently on every dimension using the anchored 1-5 scale.",
+    "Record concrete defects as P0, P1, P2, or P3 issues against A, B, or the study procedure."
+  ],
+  "scale": {
+    "min": 1,
+    "max": 5,
+    "medianPassAt": 4,
+    "anchors": {
+      "1": "Unusable or fundamentally broken",
+      "2": "Major revision required",
+      "3": "Serviceable but visibly compromised",
+      "4": "Presentation-ready with only minor polish",
+      "5": "Exceptional and immediately presentation-ready"
+    }
+  },
+  "dimensions": [
+    {
+      "id": "identity",
+      "label": "Identity",
+      "prompt": "Does the same intended protagonist remain recognizable and internally consistent throughout the deck?"
+    },
+    {
+      "id": "body-completeness",
+      "label": "Body completeness",
+      "prompt": "Are the body, limbs, endpoints, support, and contact visually complete and coherent wherever the performance requires them?"
+    },
+    {
+      "id": "crop-safety",
+      "label": "Crop safety",
+      "prompt": "Does the performer remain safely framed without clipped anatomy, hidden defects, or collisions with native slide content?"
+    },
+    {
+      "id": "claim-expression",
+      "label": "Claim expression",
+      "prompt": "Does the performance clearly express or reinforce the page claim rather than function as unrelated decoration?"
+    },
+    {
+      "id": "typography-hierarchy",
+      "label": "Typography hierarchy",
+      "prompt": "Are hierarchy, line breaks, mixed-language text, numbers, and reading comfort presentation-ready?"
+    },
+    {
+      "id": "motion-continuity",
+      "label": "Motion continuity",
+      "prompt": "Does the performance remain temporally coherent without identity drift, jumps, broken anatomy, or an unusable ending?"
+    }
+  ],
+  "issueSeverities": {
+    "P0": "Unsafe, misleading, corrupted, or impossible to present",
+    "P1": "Release-blocking visual, content, playback, or evidence defect",
+    "P2": "Important issue that should be corrected but does not invalidate the study",
+    "P3": "Minor polish opportunity"
+  },
+  "gates": {
+    "minimumReviewers": 5,
+    "requireEveryAssignedReview": true,
+    "overallV2PreferenceAtLeast": 0.7,
+    "perBenchmarkV2PreferenceAtLeast": 0.6,
+    "dimensionMedianAtLeast": 4,
+    "blockingIssueScope": "v2",
+    "maximumP0P1": 0,
+    "tiePolicy": "Tie ballots remain in the denominator and are not counted as v2 wins."
+  }
+}

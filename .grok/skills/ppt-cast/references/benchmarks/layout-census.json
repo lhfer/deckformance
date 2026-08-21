@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "benchmarkId": "layout-census",
+  "title": "Full composition-family census",
+  "track": "fixed-media",
+  "status": "defined-unexecuted",
+  "fixturePolicy": {
+    "media": "hash-pinned synthetic H.264/yuv420p clips and PNG posters",
+    "content": "fixed short, long, numeric, comparison, timeline, process, quote, UI, chart, table, decision, and section cases",
+    "networkAllowed": false
+  },
+  "assertions": [
+    "Every registered composition family is selected by at least one semantic case.",
+    "OCR equals the fixed input and no title or body crosses its resolved text bounds.",
+    "Every hybrid content page contains exactly one stable video layer and native editable evidence layers.",
+    "Candidate package media hashes, timing targets, speaker-note sources, and render receipt all bind the same artifact bytes."
+  ],
+  "releasePolicy": {
+    "galleryEligible": false,
+    "reason": "A benchmark becomes gallery material only after all automated gates and human visual review pass."
+  }
+}

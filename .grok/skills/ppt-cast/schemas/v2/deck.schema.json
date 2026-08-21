@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ppt-cast.local/schemas/v2/deck.schema.json",
+  "title": "ppt-cast v2 compiled deck",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "artifactKind", "jobId", "title", "releaseLevel", "compiledFrom", "media", "slides"],
+  "properties": {
+    "schemaVersion": { "const": "2.0.0" },
+    "artifactKind": { "const": "compiled-deck" },
+    "jobId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "releaseLevel": { "const": "candidate" },
+    "compiledFrom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contentPlan", "visualPlan", "designPlan", "assetManifest"],
+      "properties": {
+        "contentPlan": { "$ref": "#/$defs/hash" },
+        "visualPlan": { "$ref": "#/$defs/hash" },
+        "designPlan": { "$ref": "#/$defs/hash" },
+        "assetManifest": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["videoVolume", "totalBytes", "maxTotalBytes"],
+      "properties": {
+        "videoVolume": { "const": 0 },
+        "totalBytes": { "type": "integer", "minimum": 1, "maximum": 104857600 },
+        "maxTotalBytes": { "const": 104857600 }
+      }
+    },
+    "slides": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 10,
+      "items": {
+        "allOf": [
+          { "$ref": "https://ppt-cast.local/schemas/v2/design-plan.schema.json#/$defs/slide" },
+          {
+            "if": { "properties": { "mediaMode": { "const": "hybrid-video" } }, "required": ["mediaMode"] },
+            "then": {
+              "properties": {
+                "layers": {
+                  "contains": {
+                    "type": "object",
+                    "properties": {
+                      "type": { "const": "video" },
+                      "poster": { "type": "string", "minLength": 1 },
+                      "video": { "type": "string", "minLength": 1 }
+                    },
+                    "required": ["type", "poster", "video"]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "layers": {
+                  "not": {
+                    "contains": {
+                      "type": "object",
+                      "properties": { "type": { "const": "video" } },
+                      "required": ["type"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

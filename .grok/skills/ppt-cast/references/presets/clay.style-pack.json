@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "stylePackId": "clay",
+  "displayName": "Hand-shaped clay stop motion",
+  "fontStacks": {
+    "display": ["Avenir Next Heavy", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
+    "text": ["Avenir Next", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
+    "number": ["DIN Alternate", "Avenir Next Condensed", "sans-serif"]
+  },
+  "palette": {
+    "bg": "#F1E7D6",
+    "panel": "#263238",
+    "title": "#FFF8EE",
+    "body": "#D9D3C8",
+    "muted": "#9C968C",
+    "accent": "#E65F4B",
+    "ink": "#253036",
+    "inkMuted": "#69645C"
+  },
+  "material": {
+    "medium": "matte hand-shaped polymer clay with subtle fingerprints and tool marks",
+    "surface": "solid volumes, softened edges, stable joints, tactile sets",
+    "forbidden": ["glossy plastic toy finish", "liquid deformation", "photoreal skin", "generated text", "fake logos"]
+  },
+  "composition": {
+    "preferredFamilies": ["hero", "process", "comparison", "decision"],
+    "densityBias": "medium-low",
+    "negativeSpace": "use a single sculpted stage with a deliberate native-text side"
+  },
+  "camera": {
+    "default": "tabletop three-quarter miniature lens",
+    "allowed": ["static", "push-in", "pull-out", "orbit-left", "orbit-right"]
+  },
+  "motion": {
+    "cadence": "clear pose-to-pose clay stop motion with small settling beats",
+    "endBehavior": "hold-last-frame"
+  },
+  "visualBenchmarks": [
+    { "criterion": "clay material consistency", "minimumScore": 4 },
+    { "criterion": "joint and silhouette stability", "minimumScore": 4 },
+    { "criterion": "native-text negative space", "minimumScore": 4 }
+  ]
+}

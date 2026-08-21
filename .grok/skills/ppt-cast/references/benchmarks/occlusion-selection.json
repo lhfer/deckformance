@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "benchmarkId": "occlusion-selection",
+  "title": "Multiple subjects, occlusion, and explicit performer selection",
+  "track": "real-generation",
+  "status": "defined-unexecuted",
+  "fixturePolicy": {
+    "references": "licensed or synthetic two- and three-subject images with partial occlusion and background entanglement",
+    "selection": "a machine-readable selected-subject description and confidence must precede bible generation",
+    "attempts": "record provider/model/prompt hash/seed/request id/retry reason for every generation"
+  },
+  "assertions": [
+    "Low-confidence or ambiguous subject selection blocks generation instead of guessing.",
+    "Unselected people, limbs, clothing, and background features do not leak into the chosen character.",
+    "Occluded body regions are explicitly designed and evaluated rather than silently copied or truncated.",
+    "Identity and selection evidence remain bound to the chosen source bytes."
+  ],
+  "releasePolicy": {
+    "galleryEligible": false,
+    "reason": "Selection safety and generated identity require human review."
+  }
+}
