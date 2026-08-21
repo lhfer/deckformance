@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0.0",
+  "classification": "legacy-negative",
+  "claimPolicy": "These historical jobs are immutable regression inputs and must never be presented as v2 candidate, final, or gallery success evidence.",
+  "entries": [
+    {
+      "id": "spacex-intro",
+      "sourcePath": "../jobs/spacex-intro",
+      "allowedUse": ["half-body framing regression", "v1 import regression"],
+      "negativeReasons": ["historical output predates v2 design-plan and evidence receipts", "source framing is not accepted as presentation framing"]
+    },
+    {
+      "id": "qwen-office",
+      "sourcePath": "../jobs/qwen-office",
+      "allowedUse": ["legacy non-Grok import regression", "mascot identity regression"],
+      "negativeReasons": ["historical output predates v2 release gates", "old QA directories are not versioned EvaluationReceipts"]
+    },
+    {
+      "id": "layout-check",
+      "sourcePath": "../jobs/_layout-check",
+      "allowedUse": ["internal package and layout regression"],
+      "negativeReasons": ["synthetic internal fixture", "not a product or gallery deck"]
+    },
+    {
+      "id": "felt-demo",
+      "sourcePath": "../jobs/felt-demo",
+      "allowedUse": ["style-lock and character-bible fixture"],
+      "negativeReasons": ["source-only fixture", "does not contain a release-gated candidate"]
+    }
+  ]
+}

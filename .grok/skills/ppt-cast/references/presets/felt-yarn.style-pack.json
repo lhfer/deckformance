@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "stylePackId": "felt-yarn",
+  "displayName": "Needle-felted wool and crocheted yarn",
+  "fontStacks": {
+    "display": ["Avenir Next", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
+    "text": ["Avenir Next", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
+    "number": ["Avenir Next Condensed", "Avenir Next", "sans-serif"]
+  },
+  "palette": {
+    "bg": "#F4EFE6",
+    "panel": "#1C1C1C",
+    "title": "#F7F4EF",
+    "body": "#C4BFB6",
+    "muted": "#8E8A84",
+    "accent": "#D56B32",
+    "ink": "#1C1C1C",
+    "inkMuted": "#6B6560"
+  },
+  "material": {
+    "medium": "needle-felted wool mixed with crocheted yarn amigurumi",
+    "surface": "visible yarn stitches and felt fibers on every generated surface",
+    "forbidden": ["smooth CGI", "photoreal skin", "readable generated text", "fake logos", "watermarks"]
+  },
+  "composition": {
+    "preferredFamilies": ["hero", "metric", "comparison", "process"],
+    "densityBias": "low",
+    "negativeSpace": "reserve clean native-PPT zones; do not default every scene to a cream cyclorama"
+  },
+  "camera": {
+    "default": "miniature eye-level product cinematography",
+    "allowed": ["static", "push-in", "pull-out", "pan-left", "pan-right"]
+  },
+  "motion": {
+    "cadence": "restrained handmade stop-motion bounce",
+    "endBehavior": "hold-last-frame"
+  },
+  "visualBenchmarks": [
+    { "criterion": "material legibility", "minimumScore": 4 },
+    { "criterion": "identity continuity", "minimumScore": 4 },
+    { "criterion": "slot-safe body framing", "minimumScore": 4 }
+  ]
+}

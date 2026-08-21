@@ -45,13 +45,17 @@ function findVideoPictureBlocks(slideXml) {
   );
 }
 
-function findVideoShapeIds(slideXml) {
-  const ids = [];
+function findVideoShapes(slideXml) {
+  const shapes = [];
   for (const picture of findVideoPictureBlocks(slideXml)) {
-    const match = picture.match(/<p:cNvPr\b[^>]*\bid="(\d+)"/);
-    if (match) ids.push(Number(match[1]));
+    const match = picture.match(/<p:cNvPr\b[^>]*\bid="(\d+)"[^>]*\bname="([^"]+)"/);
+    if (match) shapes.push({ id: Number(match[1]), name: match[2] });
   }
-  return ids;
+  return shapes;
+}
+
+function findVideoShapeIds(slideXml) {
+  return findVideoShapes(slideXml).map((shape) => shape.id);
 }
 
 function timingXml(shapeId, durationMs, volume) {
@@ -90,11 +94,13 @@ function timingXml(shapeId, durationMs, volume) {
 
 function injectTimingIntoSlide(slideXml, options) {
   if (/<p:timing\b/.test(slideXml)) throw new Error(`slide ${options.slideNumber} already contains timing`);
-  const ids = findVideoShapeIds(slideXml);
-  if (ids.length !== 1) {
-    throw new Error(`slide ${options.slideNumber} must contain exactly one embedded video shape; found ${ids.length}`);
+  const shapes = findVideoShapes(slideXml);
+  const selected = options.layerId ? shapes.filter((shape) => shape.name === options.layerId) : shapes;
+  if (selected.length !== 1 || shapes.length !== 1) {
+    const qualifier = options.layerId ? ` named ${options.layerId}` : "";
+    throw new Error(`slide ${options.slideNumber} must contain exactly one embedded video shape${qualifier}; found ${selected.length} matching of ${shapes.length}`);
   }
-  const xml = timingXml(ids[0], options.durationMs, options.volume);
+  const xml = timingXml(selected[0].id, options.durationMs, options.volume);
   const closing = slideXml.lastIndexOf("</p:sld>");
   if (closing < 0) throw new Error(`slide ${options.slideNumber} is missing </p:sld>`);
   const afterCommonSlide = slideXml.indexOf("</p:cSld>");
@@ -129,6 +135,7 @@ function countMatches(text, pattern) {
 async function validatePackageBuffer(buffer, options = {}) {
   const zip = await JSZip.loadAsync(buffer);
   const errors = [];
+  const maxEmbeddedMediaBytes = options.maxEmbeddedMediaBytes === undefined ? 100 * 1024 * 1024 : Number(options.maxEmbeddedMediaBytes);
   const slideParts = Object.keys(zip.files)
     .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
     .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
@@ -165,6 +172,11 @@ async function validatePackageBuffer(buffer, options = {}) {
   const mimeTypesValid = pngMimeValid && mp4MimeValid;
 
   const mediaParts = Object.keys(zip.files).filter((name) => /^ppt\/media\/[^/]+\.mp4$/i.test(name));
+  const embeddedParts = Object.keys(zip.files).filter((name) => /^ppt\/media\/[^/]+$/i.test(name) && !zip.files[name].dir);
+  let embeddedMediaBytes = 0;
+  for (const mediaPart of embeddedParts) embeddedMediaBytes += (await zip.file(mediaPart).async("nodebuffer")).length;
+  if (!Number.isFinite(maxEmbeddedMediaBytes) || maxEmbeddedMediaBytes <= 0) errors.push("embedded media budget must be a positive byte count");
+  else if (embeddedMediaBytes > maxEmbeddedMediaBytes) errors.push(`package embedded media total ${embeddedMediaBytes} exceeds ${maxEmbeddedMediaBytes} bytes`);
   if (mediaParts.length !== expectedMediaCount) {
     errors.push(`package media count ${mediaParts.length} does not match expected ${expectedMediaCount}`);
   }
@@ -274,9 +286,29 @@ async function validatePackageBuffer(buffer, options = {}) {
       errors.push(`slide ${expected.slideNumber} timing is missing playFrom(0.0)`);
       timingValid = false;
     }
+    if (!/<p:cTn\b[^>]*id="1"[^>]*dur="indefinite"[^>]*restart="never"[^>]*nodeType="tmRoot"/.test(slideXml)) {
+      errors.push(`slide ${expected.slideNumber} timing root must use restart=never`);
+      timingValid = false;
+    }
+    if (Number.isFinite(expected.durationMs)) {
+      const expectedDuration = Math.max(1, Math.round(expected.durationMs));
+      const mediaDuration = slideXml.match(/<p:cmd\b[^>]*cmd="playFrom\(0\.0\)"[\s\S]*?<p:cBhvr>[\s\S]*?<p:cTn\b[^>]*\bdur="(\d+)"[^>]*\bfill="hold"/);
+      if (!mediaDuration || Number(mediaDuration[1]) !== expectedDuration) {
+        errors.push(`slide ${expected.slideNumber} timing duration must equal validated media duration ${expectedDuration}ms`);
+        timingValid = false;
+      }
+    }
     if (!/<p:video>\s*<p:cMediaNode\b/.test(slideXml)) {
       errors.push(`slide ${expected.slideNumber} timing is missing the associated p:video node`);
       timingValid = false;
+    }
+    if (Number.isFinite(expected.volume)) {
+      const expectedVolume = Math.max(0, Math.min(100000, Math.round(expected.volume)));
+      const volume = slideXml.match(/<p:video>\s*<p:cMediaNode\b[^>]*\bvol="(\d+)"/);
+      if (!volume || Number(volume[1]) !== expectedVolume) {
+        errors.push(`slide ${expected.slideNumber} media volume must equal ${expectedVolume}`);
+        timingValid = false;
+      }
     }
     if (shapeId && countMatches(slideXml, new RegExp(`<p:spTgt spid="${shapeId}"\\/>`, "g")) < 3) {
       errors.push(`slide ${expected.slideNumber} timing does not consistently target media shape ${shapeId}`);
@@ -331,6 +363,8 @@ async function validatePackageBuffer(buffer, options = {}) {
     embeddedVideoCount: mediaParts.length,
     posterCount,
     timingCount,
+    embeddedMediaBytes,
+    maxEmbeddedMediaBytes,
     relationshipsValid,
     mimeTypesValid,
     aspectRatiosValid: options.aspectRatiosValid !== false,
@@ -343,6 +377,7 @@ module.exports = {
   REL_MEDIA,
   REL_NOTES,
   REL_VIDEO,
+  findVideoShapes,
   findVideoShapeIds,
   injectAutoplay,
   injectTimingIntoSlide,

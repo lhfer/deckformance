@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0.0",
+  "benchmarkId": "failure-pack",
+  "title": "Fail-closed evidence and packaging fault injection",
+  "track": "fixed-media",
+  "status": "defined-unexecuted",
+  "fixturePolicy": {
+    "networkAllowed": false,
+    "mutations": [
+      "missing video",
+      "post-QA media hash drift",
+      "clip and deck budget overflow",
+      "wrong duration, fps, codec, pixel format, or audio stream",
+      "stale or anonymous evaluation receipt",
+      "unknown motion target layer",
+      "looping timing tree",
+      "auto-advance transition",
+      "renderer or rubric version drift"
+    ]
+  },
+  "assertions": [
+    "Every mutation is rejected before candidate publication.",
+    "A rejected run leaves no candidate.pptx or final.pptx at the release path.",
+    "The failure report names the violated contract and the exact artifact binding that drifted.",
+    "No boolean-only QA JSON can substitute for media, render, evaluation, or PowerPoint evidence."
+  ],
+  "releasePolicy": {
+    "galleryEligible": false,
+    "reason": "This suite is negative evidence only."
+  }
+}

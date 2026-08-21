@@ -23,7 +23,8 @@ async function fixture() {
   fs.writeFileSync(path.join(root, "candidate.pptx"), await zip.generateAsync({ type: "nodebuffer" }));
   const renderer = path.join(root, "renderer.py");
   writeTool(renderer, String.raw`
-import argparse, os, struct
+import argparse, os
+from PIL import Image
 p = argparse.ArgumentParser()
 p.add_argument("input")
 p.add_argument("--output_dir", required=True)
@@ -32,11 +33,7 @@ p.add_argument("--height")
 a = p.parse_args()
 os.makedirs(a.output_dir, exist_ok=True)
 for n in (1, 2):
-    head = bytearray(24)
-    head[:8] = b"\x89PNG\r\n\x1a\n"
-    head[12:16] = b"IHDR"
-    head[16:24] = struct.pack(">II", 1920, 1080)
-    open(os.path.join(a.output_dir, f"slide-{n}.png"), "wb").write(head)
+    Image.new("RGB", (1920, 1080), (20 * n, 40, 60)).save(os.path.join(a.output_dir, f"slide-{n}.png"), "PNG")
 `);
   const checker = path.join(root, "slides_test.py");
   writeTool(checker, "print('Test passed. No overflow detected.')");
@@ -53,20 +50,33 @@ test("actual-PPTX render evidence binds every slide PNG and refuses stale mixing
     "qa/rendered-candidate",
     "--renderer",
     item.renderer,
+    "--renderer-version",
+    "fixture-renderer-1",
     "--slides-test",
     item.checker,
+    "--slides-test-version",
+    "fixture-checker-1",
   ];
   const first = spawnSync("python3", args, { encoding: "utf8" });
   assert.equal(first.status, 0, first.stderr);
   const index = JSON.parse(fs.readFileSync(path.join(item.root, "qa/rendered-candidate/render-index.json"), "utf8"));
-  assert.equal(index.producer, "ppt-cast/render-pptx-qa@1");
+  assert.equal(index.producer, "ppt-cast/render-pptx-qa@2");
+  assert.equal(index.version, 2);
+  assert.match(index.producerSha256, /^sha256:[a-f0-9]{64}$/);
   assert.match(index.artifactSha256, /^sha256:[a-f0-9]{64}$/);
   assert.equal(index.slideCount, 2);
   assert.equal(index.overflowPassed, true);
   assert.deepEqual(index.renderedSlides.map((slide) => slide.slideNumber), [1, 2]);
   assert.ok(index.renderedSlides.every((slide) => slide.mime === "image/png" && slide.width === 1920 && slide.height === 1080));
-  assert.equal(path.basename(index.renderer), "renderer.py");
-  assert.equal(path.basename(index.slidesTest), "slides_test.py");
+  assert.equal(path.basename(index.renderer.name), "renderer.py");
+  assert.equal(index.renderer.version, "fixture-renderer-1");
+  assert.match(index.renderer.sha256, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(path.basename(index.slidesTest.name), "slides_test.py");
+  assert.equal(index.slidesTest.version, "fixture-checker-1");
+  assert.match(index.slidesTest.sha256, /^sha256:[a-f0-9]{64}$/);
+  assert.ok(index.runtime && index.runtime.python && index.runtime.python.version);
+  assert.match(index.runtime.python.sha256, /^sha256:[a-f0-9]{64}$/);
+  assert.ok(index.runtime.python.pillowVersion);
 
   const second = spawnSync("python3", args, { encoding: "utf8" });
   assert.notEqual(second.status, 0);
@@ -84,8 +94,12 @@ test("overflow output fails closed even when the external checker exits zero", a
     "qa/rejected-render",
     "--renderer",
     item.renderer,
+    "--renderer-version",
+    "fixture-renderer-1",
     "--slides-test",
     item.checker,
+    "--slides-test-version",
+    "fixture-checker-1",
   ], { encoding: "utf8" });
   assert.notEqual(run.status, 0);
   assert.match(run.stderr, /overflow checker reported failure/);

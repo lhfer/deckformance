@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "suiteId": "deckformance-v2-baseline",
+  "status": "defined-unexecuted",
+  "tracks": {
+    "fixed-media": {
+      "deterministic": true,
+      "purpose": "Isolate compiler, typography, PPTX packaging, timing, and renderer regressions with hash-pinned media."
+    },
+    "real-generation": {
+      "deterministic": false,
+      "purpose": "Measure provider variability, identity continuity, body completion, action quality, and retry behavior."
+    }
+  },
+  "benchmarks": [
+    {
+      "id": "layout-census",
+      "track": "fixed-media",
+      "manifest": "layout-census.json"
+    },
+    {
+      "id": "human-bust-to-body",
+      "track": "real-generation",
+      "manifest": "human-bust-to-body.json"
+    },
+    {
+      "id": "mascot-cjk",
+      "track": "fixed-media",
+      "manifest": "mascot-cjk.json"
+    },
+    {
+      "id": "occlusion-selection",
+      "track": "real-generation",
+      "manifest": "occlusion-selection.json"
+    },
+    {
+      "id": "failure-pack",
+      "track": "fixed-media",
+      "manifest": "failure-pack.json"
+    }
+  ],
+  "legacyNegativeInventory": "legacy-negative.json"
+}

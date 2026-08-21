@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "stylePackId": "paper-cut",
+  "displayName": "Layered paper-cut theatre",
+  "fontStacks": {
+    "display": ["Futura", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
+    "text": ["Avenir Next", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
+    "number": ["Futura Condensed ExtraBold", "Futura", "sans-serif"]
+  },
+  "palette": {
+    "bg": "#F7F1E3",
+    "panel": "#213547",
+    "title": "#FFF9EB",
+    "body": "#D9E0E4",
+    "muted": "#93A1AA",
+    "accent": "#E34B4B",
+    "ink": "#203141",
+    "inkMuted": "#66717A"
+  },
+  "material": {
+    "medium": "layered dyed paper and cardstock with visible cut edges and soft cast shadows",
+    "surface": "flat color fields, shallow depth layers, restrained fiber texture",
+    "forbidden": ["vector-flat zero-depth rendering", "photoreal materials", "generated text", "fake logos", "torn unreadable silhouettes"]
+  },
+  "composition": {
+    "preferredFamilies": ["timeline", "process", "comparison", "evidence"],
+    "densityBias": "medium",
+    "negativeSpace": "keep one calm paper field for editable labels and sources"
+  },
+  "camera": {
+    "default": "orthographic or shallow three-quarter stage view",
+    "allowed": ["static", "push-in", "pan-left", "pan-right", "tilt-down"]
+  },
+  "motion": {
+    "cadence": "layer slides, hinge pivots, and restrained parallax without elastic CGI easing",
+    "endBehavior": "hold-last-frame"
+  },
+  "visualBenchmarks": [
+    { "criterion": "paper layer separation", "minimumScore": 4 },
+    { "criterion": "silhouette clarity", "minimumScore": 4 },
+    { "criterion": "controlled parallax", "minimumScore": 4 }
+  ]
+}

@@ -7,6 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
+const zlib = require("node:zlib");
 
 const skillDir = path.resolve(__dirname, "..");
 const validatorPath = path.join(skillDir, "scripts", "validate_job.js");
@@ -31,27 +32,75 @@ function writeJson(root, relativePath, value) {
   return writeFile(root, relativePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function fakePng(width, height, marker = 0) {
-  const buffer = Buffer.alloc(33);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer, 0);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  buffer[24] = 8;
-  buffer[25] = 6;
-  buffer[32] = marker;
-  return buffer;
+const pngCache = new Map();
+const mp4Cache = new Map();
+const crcTable = new Uint32Array(256);
+for (let index = 0; index < 256; index += 1) {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  crcTable[index] = value >>> 0;
 }
 
-function fakeMp4(corrupt = false) {
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const typeBytes = Buffer.from(type, "ascii");
+  const body = Buffer.concat([typeBytes, data]);
+  const chunk = Buffer.alloc(12 + data.length);
+  chunk.writeUInt32BE(data.length, 0);
+  body.copy(chunk, 4);
+  chunk.writeUInt32BE(crc32(body), 8 + data.length);
+  return chunk;
+}
+
+function fixturePng(width, height, marker = 0) {
+  const key = `${width}x${height}:${marker}`;
+  if (pngCache.has(key)) return Buffer.from(pngCache.get(key));
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  const row = Buffer.alloc(1 + width * 3);
+  for (let pixel = 0; pixel < width; pixel += 1) {
+    row[1 + pixel * 3] = (marker * 37 + 51) & 0xff;
+    row[2 + pixel * 3] = (marker * 67 + 85) & 0xff;
+    row[3 + pixel * 3] = (marker * 97 + 119) & 0xff;
+  }
+  const raw = Buffer.alloc(row.length * height);
+  for (let y = 0; y < height; y += 1) row.copy(raw, y * row.length);
+  const output = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", zlib.deflateSync(raw, { level: 9 })),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+  pngCache.set(key, output);
+  return Buffer.from(output);
+}
+
+function fixtureMp4(corrupt = false, width = 720, height = 720, fps = 30) {
   if (corrupt) return Buffer.from("this is not an mp4");
-  const buffer = Buffer.alloc(32);
-  buffer.writeUInt32BE(24, 0);
-  buffer.write("ftyp", 4, "ascii");
-  buffer.write("isom", 8, "ascii");
-  buffer.write("isomiso2avc1", 16, "ascii");
-  return buffer;
+  const key = `${width}x${height}:${fps}`;
+  if (mp4Cache.has(key)) return Buffer.from(mp4Cache.get(key));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ppt-cast-media-fixture-"));
+  const target = path.join(tempDir, "fixture.mp4");
+  try {
+    const run = spawnSync("ffmpeg", [
+      "-y", "-v", "error", "-f", "lavfi", "-i", `color=c=0x335577:s=${width}x${height}:r=${fps}:d=0.2`,
+      "-t", "0.2", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "35", "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", target,
+    ], { encoding: "utf8" });
+    if (run.status !== 0) throw new Error(run.stderr || "ffmpeg fixture generation failed");
+    const output = fs.readFileSync(target);
+    mp4Cache.set(key, output);
+    return Buffer.from(output);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 function fakePptx() {
@@ -64,7 +113,7 @@ function basicDescriptor(root, relativePath, data) {
 }
 
 function pngDescriptor(root, relativePath, width = 720, height = 720, marker = 0) {
-  const target = writeFile(root, relativePath, fakePng(width, height, marker));
+  const target = writeFile(root, relativePath, fixturePng(width, height, marker));
   return {
     path: relativePath,
     sha256: sha256File(target),
@@ -76,7 +125,7 @@ function pngDescriptor(root, relativePath, width = 720, height = 720, marker = 0
 }
 
 function videoDescriptor(root, relativePath, corrupt = false, width = 720, height = 720) {
-  const target = writeFile(root, relativePath, fakeMp4(corrupt));
+  const target = writeFile(root, relativePath, fixtureMp4(corrupt, width, height));
   return {
     path: relativePath,
     sha256: sha256File(target),
@@ -110,7 +159,7 @@ function writeRenderIndex(root, directory, artifactPath, artifactSha256, rendere
 function makeFixture(options = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ppt-cast-state-"));
   const jobId = "minimal-job";
-  const sourceReference = basicDescriptor(root, "inputs/source.png", fakePng(600, 600));
+  const sourceReference = basicDescriptor(root, "inputs/source.png", fixturePng(600, 600));
 
   const brief = {
     schemaVersion: "1.0.0",
@@ -181,10 +230,10 @@ function makeFixture(options = {}) {
   const contentPath = writeJson(root, "content-plan.json", contentPlan);
   const contentHash = sha256File(contentPath);
 
-  const identity = basicDescriptor(root, "bible/identity.png", fakePng(512, 512, 1));
-  const performanceA = basicDescriptor(root, "bible/performance-a.png", fakePng(720, 900, 2));
-  const performanceB = basicDescriptor(root, "bible/performance-b.png", fakePng(720, 900, 3));
-  const sideAction = basicDescriptor(root, "bible/side-action.png", fakePng(720, 900, 4));
+  const identity = basicDescriptor(root, "bible/identity.png", fixturePng(512, 512, 1));
+  const performanceA = basicDescriptor(root, "bible/performance-a.png", fixturePng(720, 900, 2));
+  const performanceB = basicDescriptor(root, "bible/performance-b.png", fixturePng(720, 900, 3));
+  const sideAction = basicDescriptor(root, "bible/side-action.png", fixturePng(720, 900, 4));
   const fullParts = [
     "head", "torso", "left-arm", "right-arm", "left-hand", "right-hand",
     "left-leg", "right-leg", "left-foot", "right-foot",
@@ -303,7 +352,7 @@ function makeFixture(options = {}) {
   const mediaWidth = options.portrait ? 1080 : 720;
   const mediaHeight = options.portrait ? 1920 : 720;
   const poster = pngDescriptor(root, "stills/01.png", mediaWidth, mediaHeight, 5);
-  const rejectedStill = basicDescriptor(root, "stills/01-b.png", fakePng(mediaWidth, mediaHeight, 6));
+  const rejectedStill = basicDescriptor(root, "stills/01-b.png", fixturePng(mediaWidth, mediaHeight, 6));
   const video = videoDescriptor(root, "videos/01.mp4", options.corruptVideo, mediaWidth, mediaHeight);
   const frames = [0, 0.2, 0.5, 0.8, 1].map((timeRatio, index) => ({
     ...pngDescriptor(root, `qa/01/frame-${index + 1}.png`, mediaWidth, mediaHeight, 10 + index),
@@ -725,7 +774,7 @@ test("corrupt MP4 blocks candidate release even when its hash is current", (t) =
 test("stale poster and stale QA binding cannot be released", (t) => {
   const fixture = makeFixture();
   t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
-  writeFile(fixture.root, fixture.poster.path, fakePng(720, 720, 99));
+  writeFile(fixture.root, fixture.poster.path, fixturePng(720, 720, 99));
   const result = validateJob(fixture.root, { releaseLevel: "candidate" });
   assert.equal(result.ok, false);
   assert.equal(errorCodes(result).has("STALE_ASSET"), true);
@@ -984,7 +1033,7 @@ test("candidate remains distinct from final until PowerPoint evidence is bound",
     passed: true,
   };
   const finalRenderEvidencePath = writeJson(fixture.root, "qa/final-render-qa.json", finalRenderEvidence);
-  const capturePath = writeFile(fixture.root, "qa/powerpoint-capture.mp4", fakeMp4());
+  const capturePath = writeFile(fixture.root, "qa/powerpoint-capture.mp4", fixtureMp4(false, 1920, 1080, 30));
   const verification = {
     artifactSha256: finalHash,
     platform: "macos",
@@ -1248,7 +1297,7 @@ test("jobctl final release rejects stale final-package QA, then accepts correctl
     layoutRhythmPassed: true,
     passed: true,
   });
-  const capturePath = writeFile(fixture.root, "qa/powerpoint-capture.mp4", fakeMp4());
+  const capturePath = writeFile(fixture.root, "qa/powerpoint-capture.mp4", fixtureMp4(false, 1920, 1080, 30));
   const powerPointEvidence = {
     artifactSha256: finalHash,
     platform: "macos",

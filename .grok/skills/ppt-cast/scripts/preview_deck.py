@@ -17,6 +17,30 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 ORPHAN_PUNCTUATION = set("，。！？；：、,.!?;:)]}》」』】")
+CJK_FONT_MARKERS = (
+    "cjk",
+    "heiti",
+    "hiragino sans gb",
+    "microsoft yahei",
+    "noto sans sc",
+    "noto sans tc",
+    "pingfang",
+    "simsun",
+    "songti",
+    "source han",
+    "微软雅黑",
+    "黑体",
+    "宋体",
+)
+
+
+def contains_cjk(value: str) -> bool:
+    return any("\u4e00" <= ch <= "\u9fff" for ch in value)
+
+
+def is_cjk_font_face(value: object) -> bool:
+    normalized = str(value or "").casefold()
+    return any(marker in normalized for marker in CJK_FONT_MARKERS)
 
 
 def hex_rgb(s: str, fallback: str) -> tuple[int, int, int]:
@@ -34,12 +58,17 @@ def load_font(
             "/System/Library/Fonts/STHeiti Medium.ttc" if bold else "/System/Library/Fonts/STHeiti Light.ttc",
             "/System/Library/Fonts/Hiragino Sans GB.ttc",
             "/System/Library/Fonts/STHeiti Medium.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc",
         )
     else:
         candidates = (
             "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
             "/Library/Fonts/Arial Bold.ttf" if bold else "/Library/Fonts/Arial.ttf",
             "/System/Library/Fonts/Helvetica.ttc",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+            "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
         )
     for p in candidates:
         if Path(p).exists():
@@ -47,7 +76,7 @@ def load_font(
                 return ImageFont.truetype(p, size)
             except OSError:
                 continue
-    return ImageFont.load_default()
+    raise RuntimeError("no usable TrueType/OpenType preview font is available")
 
 
 def cover_paste(base: Image.Image, src_path: Path, box: tuple[int, int, int, int]) -> None:
@@ -106,11 +135,8 @@ def main() -> int:
     ink_muted = hex_rgb(pal.get("inkMuted"), "6B6560")
     fonts = layouts_doc["fonts"]
     issues: list[str] = []
-    cjk = bool(deck.get("fontFace")) or any(
-        any(
-            "\u4e00" <= ch <= "\u9fff"
-            for ch in str(s.get("title", "") + "".join(s.get("body") or []))
-        )
+    cjk = is_cjk_font_face(deck.get("fontFace")) or any(
+        contains_cjk(str(s.get("title", "") + "".join(s.get("body") or [])))
         for s in deck.get("slides") or []
     )
 

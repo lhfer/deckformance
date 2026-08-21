@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "stylePackId": "cinematic-miniature",
+  "displayName": "Cinematic practical miniature",
+  "fontStacks": {
+    "display": ["Helvetica Neue", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
+    "text": ["Helvetica Neue", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
+    "number": ["Helvetica Neue Condensed Bold", "Helvetica Neue", "sans-serif"]
+  },
+  "palette": {
+    "bg": "#0B0F14",
+    "panel": "#171E26",
+    "title": "#F5F2EA",
+    "body": "#C5CBD1",
+    "muted": "#7E8993",
+    "accent": "#E7A63B",
+    "ink": "#11171D",
+    "inkMuted": "#59636C"
+  },
+  "material": {
+    "medium": "physically built scale model with practical surfaces, atmosphere, and motivated light",
+    "surface": "painted wood, metal, resin, fabric, dust, and subtle fabrication seams at believable scale",
+    "forbidden": ["full-size photoreal scene", "generic glossy CGI", "generated text", "fake logos", "unmotivated neon"]
+  },
+  "composition": {
+    "preferredFamilies": ["hero", "evidence", "metric", "product-ui"],
+    "densityBias": "low",
+    "negativeSpace": "light and frame a deliberate dark or calm zone for native evidence"
+  },
+  "camera": {
+    "default": "restrained macro-cinema lens at miniature eye level",
+    "allowed": ["static", "push-in", "pull-out", "pan-left", "pan-right", "orbit-left", "orbit-right"]
+  },
+  "motion": {
+    "cadence": "grounded cinematic movement with practical inertia and no game-engine float",
+    "endBehavior": "hold-last-frame"
+  },
+  "visualBenchmarks": [
+    { "criterion": "miniature scale cues", "minimumScore": 4 },
+    { "criterion": "motivated cinematography", "minimumScore": 4 },
+    { "criterion": "material and identity continuity", "minimumScore": 4 }
+  ]
+}

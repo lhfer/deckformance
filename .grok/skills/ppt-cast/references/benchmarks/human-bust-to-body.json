@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "benchmarkId": "human-bust-to-body",
+  "title": "Half-body identity reference to presentation-safe full-body performance",
+  "track": "real-generation",
+  "status": "defined-unexecuted",
+  "fixturePolicy": {
+    "identityReference": "licensed or synthetic waist-up human reference",
+    "requiredOutput": "same identity with designed lower body, visible limb endpoints, support contact, and slot-safe margins",
+    "attempts": "record every candidate, provider request id, seed, model version, retry reason, duration, and cost"
+  },
+  "assertions": [
+    "Identity is preserved without copying the source crop, pose, camera distance, or background.",
+    "Hands, legs, feet, and ground contact remain coherent at all five bound QA frames.",
+    "No framing or body-completion defect is hidden by cropping during normalization.",
+    "First-attempt and within-budget success rates are reported separately."
+  ],
+  "releasePolicy": {
+    "galleryEligible": false,
+    "reason": "Generated identity and body completion require recorded human approval."
+  }
+}

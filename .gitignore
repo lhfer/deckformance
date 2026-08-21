@@ -22,4 +22,4 @@ archive/
 # Test and coverage output
 coverage/
 .nyc_output/
-
+dist/
