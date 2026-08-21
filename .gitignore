@@ -1,0 +1,25 @@
+.DS_Store
+.env
+.env.*
+*.log
+*.py[cod]
+**/__pycache__/
+**/node_modules/
+
+# Job inputs, generated media, QA evidence, and deliverables
+jobs/
+build/
+qa/
+preview/
+normalized/
+archive/
+*.pptx
+*.ppsx
+*.mp4
+*.mov
+*.webm
+
+# Test and coverage output
+coverage/
+.nyc_output/
+

@@ -1,0 +1,14 @@
+{
+  "name": "ppt-cast-scripts",
+  "private": true,
+  "description": "Deck builder for the ppt-cast skill",
+  "scripts": {
+    "test": "node --test ../tests/state_contracts.test.js ../../../../tests/build*.test.js"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "jszip": "^3.10.1",
+    "pptxgenjs": "^4.0.1"
+  }
+}

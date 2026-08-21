@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ppt-cast.local/schemas/job.schema.json",
+  "title": "ppt-cast job state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "jobId", "state", "artifacts", "trackedArtifacts", "release"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "jobId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "status", "completedStages", "invalidatedStages", "updatedAt", "history"],
+      "properties": {
+        "stage": { "$ref": "#/$defs/stage" },
+        "status": { "enum": ["active", "blocked", "failed", "complete"] },
+        "completedStages": { "type": "array", "items": { "$ref": "#/$defs/stage" }, "uniqueItems": true },
+        "invalidatedStages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stage", "reason", "at"],
+            "properties": {
+              "stage": { "$ref": "#/$defs/stage" },
+              "reason": { "type": "string", "minLength": 1 },
+              "at": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to", "at", "inputHashes", "evidence", "note"],
+            "properties": {
+              "from": { "$ref": "#/$defs/stage" },
+              "to": { "$ref": "#/$defs/stage" },
+              "at": { "type": "string", "format": "date-time" },
+              "inputHashes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/hash" } },
+              "evidence": { "type": "array", "items": { "$ref": "#/$defs/path" } },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brief", "characterModel", "contentPlan", "visualPlan", "assetManifest", "deck"],
+      "properties": {
+        "brief": { "const": "brief.json" },
+        "characterModel": { "const": "character-model.json" },
+        "contentPlan": { "const": "content-plan.json" },
+        "visualPlan": { "const": "visual-plan.json" },
+        "assetManifest": { "const": "asset-manifest.json" },
+        "deck": { "const": "deck.json" }
+      }
+    },
+    "trackedArtifacts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "stage"],
+        "properties": {
+          "path": { "$ref": "#/$defs/path" },
+          "sha256": { "$ref": "#/$defs/hash" },
+          "stage": { "$ref": "#/$defs/stage" }
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "final"],
+      "properties": {
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "artifact", "sha256", "validatedAt", "playbackVerified", "packageQa", "renderQa"],
+          "properties": {
+            "status": { "enum": ["none", "released"] },
+            "artifact": { "type": ["string", "null"] },
+            "sha256": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+            "validatedAt": { "type": ["string", "null"], "format": "date-time" },
+            "playbackVerified": { "const": false },
+            "packageQa": { "oneOf": [{ "$ref": "#/$defs/packageQa" }, { "type": "null" }] },
+            "renderQa": { "oneOf": [{ "$ref": "#/$defs/renderQa" }, { "type": "null" }] }
+          }
+        },
+        "final": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "artifact", "sha256", "validatedAt", "packageQa", "renderQa", "powerPointVerification"],
+          "properties": {
+            "status": { "enum": ["none", "released"] },
+            "artifact": { "type": ["string", "null"] },
+            "sha256": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+            "validatedAt": { "type": ["string", "null"], "format": "date-time" },
+            "packageQa": { "oneOf": [{ "$ref": "#/$defs/packageQa" }, { "type": "null" }] },
+            "renderQa": { "oneOf": [{ "$ref": "#/$defs/renderQa" }, { "type": "null" }] },
+            "powerPointVerification": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["artifactSha256", "platform", "appVersion", "testedAt", "capturePath", "captureSha256", "testedSlideIds", "evidencePath", "evidenceSha256", "autoPlayOnce", "noLoop", "manualAdvance", "passed"],
+                  "properties": {
+                    "artifactSha256": { "$ref": "#/$defs/hash" },
+                    "platform": { "enum": ["macos", "windows"] },
+                    "appVersion": { "type": "string", "minLength": 1 },
+                    "testedAt": { "type": "string", "format": "date-time" },
+                    "capturePath": { "allOf": [{ "$ref": "#/$defs/path" }, { "pattern": "\\.mp4$" }] },
+                    "captureSha256": { "$ref": "#/$defs/hash" },
+                    "testedSlideIds": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+                    "evidencePath": { "$ref": "#/$defs/path" },
+                    "evidenceSha256": { "$ref": "#/$defs/hash" },
+                    "autoPlayOnce": { "const": true },
+                    "noLoop": { "const": true },
+                    "manualAdvance": { "const": true },
+                    "passed": { "const": true }
+                  }
+                },
+                { "type": "null" }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "path": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\][^\\\\]*$" },
+    "stage": {
+      "enum": [
+        "initialized",
+        "briefed",
+        "researched",
+        "content-planned",
+        "character-ready",
+        "visual-planned",
+        "layout-ready",
+        "stills-ready",
+        "videos-ready",
+        "packaged",
+        "qa-passed",
+        "candidate-released",
+        "final-released"
+      ]
+    },
+    "renderQa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactSha256", "slideCount", "renderIndexPath", "renderIndexSha256", "renderedSlides", "allSlidesInspected", "overflowPassed", "textWrapPassed", "cropPassed", "mediaPosterPassed", "layoutRhythmPassed", "passed", "evidencePath", "evidenceSha256"],
+      "properties": {
+        "artifactSha256": { "$ref": "#/$defs/hash" },
+        "slideCount": { "type": "integer", "minimum": 2, "maximum": 10 },
+        "renderIndexPath": { "$ref": "#/$defs/path" },
+        "renderIndexSha256": { "$ref": "#/$defs/hash" },
+        "renderedSlides": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["slideNumber", "path", "sha256", "width", "height", "mime"],
+            "properties": {
+              "slideNumber": { "type": "integer", "minimum": 1, "maximum": 10 },
+              "path": { "$ref": "#/$defs/path" },
+              "sha256": { "$ref": "#/$defs/hash" },
+              "width": { "type": "integer", "minimum": 1 },
+              "height": { "type": "integer", "minimum": 1 },
+              "mime": { "const": "image/png" }
+            }
+          }
+        },
+        "allSlidesInspected": { "const": true },
+        "overflowPassed": { "const": true },
+        "textWrapPassed": { "const": true },
+        "cropPassed": { "const": true },
+        "mediaPosterPassed": { "const": true },
+        "layoutRhythmPassed": { "const": true },
+        "passed": { "const": true },
+        "evidencePath": { "$ref": "#/$defs/path" },
+        "evidenceSha256": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "packageQa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactSha256", "deckSha256", "expectedContentPages", "embeddedVideoCount", "posterCount", "timingCount", "relationshipsValid", "mimeTypesValid", "aspectRatiosValid", "passed", "evidencePath", "evidenceSha256"],
+      "properties": {
+        "artifactSha256": { "$ref": "#/$defs/hash" },
+        "deckSha256": { "$ref": "#/$defs/hash" },
+        "expectedContentPages": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "embeddedVideoCount": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "posterCount": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "timingCount": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "relationshipsValid": { "const": true },
+        "mimeTypesValid": { "const": true },
+        "aspectRatiosValid": { "const": true },
+        "passed": { "const": true },
+        "evidencePath": { "$ref": "#/$defs/path" },
+        "evidenceSha256": { "$ref": "#/$defs/hash" }
+      }
+    }
+  }
+}

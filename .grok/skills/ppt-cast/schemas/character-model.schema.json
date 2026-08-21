@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ppt-cast.local/schemas/character-model.schema.json",
+  "title": "ppt-cast character model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "upstreamHashes",
+    "subjectKind",
+    "sourceReference",
+    "referenceDiagnostic",
+    "identityLock",
+    "identityBible",
+    "performanceBible",
+    "promptPolicy",
+    "cropPolicy"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "jobId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "upstreamHashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brief"],
+      "properties": { "brief": { "$ref": "#/$defs/hash" } }
+    },
+    "subjectKind": { "enum": ["human", "humanoid-mascot", "animal", "non-human"] },
+    "sourceReference": { "$ref": "#/$defs/asset" },
+    "referenceDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coverage",
+        "subjectCount",
+        "selectedSubject",
+        "selectionConfidence",
+        "faceClarity",
+        "viewAngle",
+        "occlusions",
+        "visibleClothing",
+        "missingBodyParts",
+        "backgroundEntanglement"
+      ],
+      "properties": {
+        "coverage": {
+          "enum": ["headshot", "bust", "half-body", "three-quarter", "full-body", "occluded", "multi-subject", "non-human"]
+        },
+        "subjectCount": { "type": "integer", "minimum": 1 },
+        "selectedSubject": { "type": "string", "minLength": 1 },
+        "selectionConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "faceClarity": { "enum": ["high", "medium", "low", "not-applicable"] },
+        "viewAngle": { "enum": ["front", "three-quarter", "profile", "rear", "mixed", "not-applicable"] },
+        "occlusions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "visibleClothing": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "missingBodyParts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "backgroundEntanglement": { "type": "boolean" }
+      }
+    },
+    "identityLock": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "identityBible": {
+      "allOf": [
+        { "$ref": "#/$defs/asset" },
+        {
+          "type": "object",
+          "required": ["qaPassed"],
+          "properties": { "qaPassed": { "const": true } }
+        }
+      ]
+    },
+    "performanceBible": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidates", "selectedCandidateId", "selectedSha256", "sideActionReference", "bodyDesign", "fullBodyProfile", "qa"],
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "path", "sha256", "qa"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "path": { "$ref": "#/$defs/path" },
+              "sha256": { "$ref": "#/$defs/hash" },
+              "qa": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["identityConsistency", "bodyCompleteness", "proportionStability", "animatability", "passed"],
+                "properties": {
+                  "identityConsistency": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "bodyCompleteness": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "proportionStability": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "animatability": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "passed": { "type": "boolean" }
+                },
+                "allOf": [
+                  {
+                    "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
+                    "then": {
+                      "properties": {
+                        "identityConsistency": { "minimum": 0.85 },
+                        "bodyCompleteness": { "minimum": 0.85 },
+                        "proportionStability": { "minimum": 0.85 },
+                        "animatability": { "minimum": 0.85 }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "selectedCandidateId": { "type": "string", "minLength": 1 },
+        "selectedSha256": { "$ref": "#/$defs/hash" },
+        "sideActionReference": {
+          "allOf": [
+            { "$ref": "#/$defs/asset" },
+            {
+              "type": "object",
+              "required": ["qaPassed"],
+              "properties": { "qaPassed": { "const": true } }
+            }
+          ]
+        },
+        "bodyDesign": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stature", "proportionNotes", "clothing", "footwearOrBase", "handsOrExtremities", "silhouette", "designedCompletions"],
+          "properties": {
+            "stature": { "type": "string", "minLength": 1 },
+            "proportionNotes": { "type": "string", "minLength": 1 },
+            "clothing": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "footwearOrBase": { "type": "string", "minLength": 1 },
+            "handsOrExtremities": { "type": "string", "minLength": 1 },
+            "silhouette": { "type": "string", "minLength": 1 },
+            "designedCompletions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+          }
+        },
+        "fullBodyProfile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "coverage",
+            "requiredParts",
+            "visibleParts",
+            "missingParts",
+            "limbEndpointsVisible",
+            "supportContactVisible",
+            "groundContactStable",
+            "headToBodyRatio",
+            "safeMarginPercent"
+          ],
+          "properties": {
+            "coverage": { "const": "full-body" },
+            "requiredParts": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "visibleParts": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "missingParts": { "type": "array", "maxItems": 0 },
+            "limbEndpointsVisible": { "const": true },
+            "supportContactVisible": { "const": true },
+            "groundContactStable": { "const": true },
+            "headToBodyRatio": { "type": "number", "exclusiveMinimum": 0 },
+            "safeMarginPercent": { "type": "number", "minimum": 5, "maximum": 40 }
+          }
+        },
+        "qa": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identityConsistent", "bodyComplete", "proportionsStable", "animatable", "passed"],
+          "properties": {
+            "identityConsistent": { "const": true },
+            "bodyComplete": { "const": true },
+            "proportionsStable": { "const": true },
+            "animatable": { "const": true },
+            "passed": { "const": true }
+          }
+        }
+      }
+    },
+    "promptPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserve", "doNotCopyFromSource"],
+      "properties": {
+        "preserve": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "doNotCopyFromSource": { "type": "array", "minItems": 5, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "cropPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed", "forbiddenJoints"],
+      "properties": {
+        "allowed": { "type": "array", "minItems": 1, "items": { "enum": ["full-body", "three-quarter", "waist-up", "close-up"] }, "uniqueItems": true },
+        "forbiddenJoints": { "type": "array", "minItems": 8, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "path": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\][^\\\\]*$" },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "qaPassed": { "type": "boolean" }
+      }
+    }
+  }
+}

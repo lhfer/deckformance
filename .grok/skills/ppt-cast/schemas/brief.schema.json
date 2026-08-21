@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ppt-cast.local/schemas/brief.schema.json",
+  "title": "ppt-cast brief",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "topic",
+    "audience",
+    "purpose",
+    "coreMessage",
+    "mustCover",
+    "brand",
+    "creativeDirection",
+    "sourcePolicy",
+    "requestedPageCount",
+    "sourceMaterials"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "jobId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "topic": { "type": "string", "minLength": 1 },
+    "audience": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "knowledgeLevel"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "knowledgeLevel": { "enum": ["new", "familiar", "expert", "mixed"] }
+      }
+    },
+    "purpose": { "type": "string", "minLength": 1 },
+    "coreMessage": { "type": "string", "minLength": 1 },
+    "mustCover": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "brand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "attributes", "assetPaths", "colorGuidance"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "attributes": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "assetPaths": { "type": "array", "items": { "$ref": "#/$defs/path" }, "uniqueItems": true },
+        "colorGuidance": { "type": ["string", "null"] }
+      }
+    },
+    "creativeDirection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "desiredStyle", "mood", "energy", "avoid"],
+      "properties": {
+        "language": { "type": "string", "minLength": 1 },
+        "desiredStyle": { "type": "string", "minLength": 1 },
+        "mood": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "energy": { "type": "string", "minLength": 1 },
+        "avoid": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "sourcePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowPublicResearch", "preferPrimarySources", "privateMaterialMayLeaveJob"],
+      "properties": {
+        "allowPublicResearch": { "type": "boolean" },
+        "preferPrimarySources": { "type": "boolean" },
+        "privateMaterialMayLeaveJob": { "const": false }
+      }
+    },
+    "requestedPageCount": {
+      "oneOf": [
+        { "type": "integer", "minimum": 2, "maximum": 10 },
+        { "type": "null" }
+      ]
+    },
+    "sourceMaterials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "private"],
+        "properties": {
+          "path": { "$ref": "#/$defs/path" },
+          "sha256": { "$ref": "#/$defs/hash" },
+          "private": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "path": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\][^\\\\]*$" }
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ppt-cast.local/schemas/visual-plan.schema.json",
+  "title": "ppt-cast visual plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "jobId", "upstreamHashes", "brandDirection", "slides"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "jobId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "upstreamHashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brief", "characterModel", "contentPlan"],
+      "properties": {
+        "brief": { "$ref": "#/$defs/hash" },
+        "characterModel": { "$ref": "#/$defs/hash" },
+        "contentPlan": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "brandDirection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deckPalette", "sourceSwatches", "typography", "materials", "lighting", "motionLanguage"],
+      "properties": {
+        "deckPalette": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bg", "panel", "title", "body", "muted", "accent", "ink", "inkMuted"],
+          "properties": {
+            "bg": { "$ref": "#/$defs/color" },
+            "panel": { "$ref": "#/$defs/color" },
+            "title": { "$ref": "#/$defs/color" },
+            "body": { "$ref": "#/$defs/color" },
+            "muted": { "$ref": "#/$defs/color" },
+            "accent": { "$ref": "#/$defs/color" },
+            "ink": { "$ref": "#/$defs/color" },
+            "inkMuted": { "$ref": "#/$defs/color" }
+          }
+        },
+        "sourceSwatches": { "type": "array", "minItems": 3, "items": { "$ref": "#/$defs/color" } },
+        "typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "body", "number", "rationale"],
+          "properties": {
+            "title": { "type": "string", "minLength": 1 },
+            "body": { "type": "string", "minLength": 1 },
+            "number": { "type": "string", "minLength": 1 },
+            "rationale": { "type": "string", "minLength": 1 }
+          }
+        },
+        "materials": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "lighting": { "type": "string", "minLength": 1 },
+        "motionLanguage": { "type": "string", "minLength": 1 }
+      }
+    },
+    "slides": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "visualProposition", "required", "optional", "forbidden", "characterPerformance", "layoutId", "layoutFamily", "slot", "actionClass", "shotPlan", "generation"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+          "visualProposition": { "type": "string", "minLength": 1 },
+          "required": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "optional": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "forbidden": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "characterPerformance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["present", "roleInClaim", "action"],
+            "properties": {
+              "present": { "const": true },
+              "roleInClaim": { "type": "string", "minLength": 1 },
+              "action": { "type": "string", "minLength": 1 }
+            }
+          },
+          "layoutId": {
+            "enum": [
+              "cinematic-full",
+              "split-left-video",
+              "split-right-video",
+              "character-stage-left",
+              "character-stage-right",
+              "top-video",
+              "bottom-video",
+              "center-cinema",
+              "comparison-stage",
+              "metric-video"
+            ]
+          },
+          "layoutFamily": {
+            "enum": [
+              "full-bleed-cinema",
+              "asymmetric-split-left",
+              "asymmetric-split-right",
+              "character-stage-left",
+              "character-stage-right",
+              "top-widescreen",
+              "bottom-widescreen",
+              "centered-cinema-window",
+              "dual-character-comparison",
+              "large-metric-with-video"
+            ]
+          },
+          "slot": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["aspect", "widthPx", "heightPx", "posterFormat"],
+            "properties": {
+              "aspect": { "type": "string", "pattern": "^[1-9][0-9]*:[1-9][0-9]*$" },
+              "widthPx": { "type": "integer", "minimum": 240, "maximum": 1920 },
+              "heightPx": { "type": "integer", "minimum": 240, "maximum": 1920 },
+              "posterFormat": { "const": "png" }
+            }
+          },
+          "actionClass": {
+            "enum": ["locomotion", "jump", "landing", "push-pull", "large-prop", "upper-body-gesture", "idle", "other"]
+          },
+          "shotPlan": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "shotType",
+              "bodyVisibility",
+              "actionEnvelope",
+              "occlusionReason",
+              "safeCrop",
+              "groundContact",
+              "framingRationale",
+              "framingBoundary",
+              "bodyContinuation",
+              "derivedFromSourceCrop",
+              "cutsAtJoints"
+            ],
+            "properties": {
+              "shotType": { "enum": ["full-body", "three-quarter", "waist-up", "close-up"] },
+              "bodyVisibility": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+              "actionEnvelope": { "$ref": "#/$defs/rect" },
+              "occlusionReason": { "type": ["string", "null"] },
+              "safeCrop": { "$ref": "#/$defs/rect" },
+              "groundContact": { "enum": ["standing", "seated", "floating", "attached", "not-visible-intentionally"] },
+              "framingRationale": { "type": "string", "minLength": 1 },
+              "framingBoundary": { "enum": ["full-body-contained", "natural-edge-exit", "explained-occlusion", "close-up"] },
+              "bodyContinuation": { "type": "string", "minLength": 1 },
+              "derivedFromSourceCrop": { "const": false },
+              "cutsAtJoints": { "const": false }
+            }
+          },
+          "generation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stillCandidateCount", "videoMaxAttempts", "motionStrategy", "noReadableText"],
+            "properties": {
+              "stillCandidateCount": { "type": "integer", "minimum": 2, "maximum": 3 },
+              "videoMaxAttempts": { "const": 3 },
+              "motionStrategy": { "enum": ["stable", "cinematic", "diagrammatic", "ambient"] },
+              "noReadableText": { "const": true }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "color": { "type": "string", "pattern": "^#[A-Fa-f0-9]{6}$" },
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "top", "right", "bottom"],
+      "properties": {
+        "left": { "type": "number", "minimum": 0, "maximum": 1 },
+        "top": { "type": "number", "minimum": 0, "maximum": 1 },
+        "right": { "type": "number", "minimum": 0, "maximum": 1 },
+        "bottom": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

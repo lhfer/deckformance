@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ppt-cast.local/schemas/content-plan.schema.json",
+  "title": "ppt-cast content plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "jobId", "upstreamHashes", "thesis", "narrative", "coverageMatrix", "sources", "slides"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "jobId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "upstreamHashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brief"],
+      "properties": { "brief": { "$ref": "#/$defs/hash" } }
+    },
+    "thesis": { "type": "string", "minLength": 1 },
+    "narrative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["promise", "development", "proof", "conclusion"],
+      "properties": {
+        "promise": { "type": "string", "minLength": 1 },
+        "development": { "type": "string", "minLength": 1 },
+        "proof": { "type": "string", "minLength": 1 },
+        "conclusion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "coverageMatrix": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mustCover", "slideIds", "support"],
+        "properties": {
+          "mustCover": { "type": "string", "minLength": 1 },
+          "slideIds": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "support": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "kind", "url", "publisher", "retrievedAt", "isPrimary", "supports"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["user-material", "public-url", "inference"] },
+          "url": { "type": ["string", "null"] },
+          "publisher": { "type": ["string", "null"] },
+          "retrievedAt": { "type": ["string", "null"], "format": "date-time" },
+          "isPrimary": { "type": "boolean" },
+          "supports": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "kind": { "const": "public-url" } }, "required": ["kind"] },
+            "then": {
+              "properties": {
+                "url": { "type": "string", "pattern": "^https?://" },
+                "retrievedAt": { "type": "string", "format": "date-time" }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "slides": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "title", "body", "role", "claim", "evidence", "evidenceBasis", "transition", "takeaway", "sourceIds", "videoRequired"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+          "type": { "enum": ["cover", "section", "content", "closing"] },
+          "title": { "type": "string", "minLength": 1 },
+          "body": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "type": "string", "minLength": 1 } },
+          "role": { "type": "string", "minLength": 1 },
+          "claim": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "evidenceBasis": { "enum": ["none", "user-material", "public-source", "inference", "mixed"] },
+          "transition": { "type": "string", "minLength": 1 },
+          "takeaway": { "type": "string", "minLength": 1 },
+          "sourceIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "videoRequired": { "type": "boolean" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "type": { "enum": ["content", "closing"] } }, "required": ["type"] },
+            "then": { "properties": { "videoRequired": { "const": true }, "sourceIds": { "minItems": 1 }, "evidenceBasis": { "not": { "const": "none" } } } }
+          },
+          {
+            "if": { "properties": { "type": { "enum": ["cover", "section"] } }, "required": ["type"] },
+            "then": { "properties": { "videoRequired": { "const": false }, "evidenceBasis": { "const": "none" } } }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}
