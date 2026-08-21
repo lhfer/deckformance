@@ -19,6 +19,8 @@ The media and copy do different jobs:
 - the panel carries hierarchy, language, and conclusion;
 - neither layer overlays or obscures the other.
 
+“Clean” never means backgroundless. Each media scene needs a story-specific felt miniature world with readable foreground, midground, and background depth. The environment should carry the page metaphor through restrained landscapes, paths, trees, clouds, shelves, windows, workshops, or architecture. A plain studio sweep, empty tabletop, or large unused sky is not an accepted final scene merely because the subject is centered.
+
 ## Reference-derived structure
 
 The supplied reference uses a single horizontal card near `2.08:1`, centered on a warm oatmeal canvas. Media and panel are equal-height, zero-gutter neighbors inside one outer boundary. The reference itself is about `52.5/47.5`; this master compares `54/46`, `57/43`, and `60/40` without changing any other composition rule.
@@ -73,6 +75,7 @@ Shaping may add punctuation, expose sentence boundaries, or select approved clai
 - the preferred poster/video framing is near `6:5`, or a deliberately composed near-square source;
 - keep the primary action and characters inside the central `72%` safe area;
 - subjects avoid the seam and remain readable after a mild cover crop;
+- a meaningful environment remains visible around the subject, with foreground, midground, and background depth rather than a generic studio void;
 - no slide copy, logos, or dark panel is burned into the poster/video;
 - a `16:9` source is not treated as a lossless fit. It needs a subject-aware crop or regeneration for the near-square slot.
 

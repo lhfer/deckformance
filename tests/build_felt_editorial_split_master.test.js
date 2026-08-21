@@ -45,6 +45,8 @@ test("media-left and media-right are exact geometry mirrors", () => {
   assert.equal(left.media.left + right.media.left + right.media.width, left.card.left * 2 + left.card.width);
   assert.equal(left.mediaContract.preferredAspect, "6:5");
   assert.ok(left.mediaContract.renderedAspect > 1.17 && left.mediaContract.renderedAspect < 1.20);
+  assert.equal(left.mediaContract.environment.required, true);
+  assert.deepEqual(left.mediaContract.environment.depthLayers, ["foreground", "midground", "background"]);
 });
 
 test("headline shaping preserves semantic phrases and produces multiple eligible candidates", () => {

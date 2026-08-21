@@ -190,6 +190,11 @@ function geometryForFeltMaster({ slideWidth, slideHeight, mediaSide = "media-lef
       fit: "cover",
       centralSafeArea: 0.72,
       sourceTextBurnedIn: false,
+      environment: {
+        required: true,
+        depthLayers: ["foreground", "midground", "background"],
+        rule: "Use a story-specific felt miniature environment; clean hierarchy must not collapse into a plain studio wall or empty tabletop.",
+      },
     },
     edgeTreatment: {
       type: "source-derived-alpha-mask",
